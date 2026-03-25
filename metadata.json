@@ -1,0 +1,8 @@
+{
+  "name": "TubeAI Studio",
+  "description": "A comprehensive YouTube content automation suite that helps you architect a channel, generate scripts, design thumbnails, and create AI-powered video clips using Gemini, Veo, Llama 3, and Mistral. (Note: Llama/Mistral require HUGGINGFACE_API_KEY).",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
