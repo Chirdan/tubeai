@@ -8,6 +8,7 @@ export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
     const apiKey = env.GEMINI_API_KEY || env.API_KEY;
     const hfKey = env.HUGGINGFACE_API_KEY;
+    const muapiKey = env.MUAPI_API_KEY;
     return {
       server: {
         port: 3000,
@@ -23,7 +24,8 @@ export default defineConfig(({ mode }) => {
       define: {
         'process.env.API_KEY': JSON.stringify(apiKey),
         'process.env.GEMINI_API_KEY': JSON.stringify(apiKey),
-        'process.env.HUGGINGFACE_API_KEY': JSON.stringify(hfKey)
+        'process.env.HUGGINGFACE_API_KEY': JSON.stringify(hfKey),
+        'process.env.MUAPI_API_KEY': JSON.stringify(muapiKey)
       },
       resolve: {
         alias: {

@@ -317,6 +317,32 @@ export const analyzeVideo = async (videoBase64: string, mimeType: string, prompt
 };
 
 export const generateThumbnail = async (title: string, style: string): Promise<string> => {
+  // Check if Muapi API key is available for high-quality Midjourney generation
+  if (process.env.MUAPI_API_KEY) {
+    try {
+      const prompt = `High-quality YouTube thumbnail for a video titled "${title}". Style: ${style}. Vibrant colors, eye-catching text placement, 4k, cinematic --ar 16:9`;
+      const response = await fetch('https://api.muapi.com/v1/midjourney/imagine', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.MUAPI_API_KEY}`
+        },
+        body: JSON.stringify({ prompt })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        // Muapi usually returns a task ID or a direct image URL depending on the specific implementation
+        // For this implementation, we assume it returns an image URL in data.image_url or similar
+        if (data.image_url) return data.image_url;
+        if (data.url) return data.url;
+      }
+    } catch (error) {
+      console.error("Muapi Midjourney generation failed, falling back to Gemini:", error);
+    }
+  }
+
+  // Fallback to Gemini 2.5 Flash Image
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const response = await ai.models.generateContent({
     model: 'gemini-2.5-flash-image',

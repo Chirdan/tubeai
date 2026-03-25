@@ -129,6 +129,22 @@ const StudioView: React.FC<StudioViewProps> = ({ profile, onPost, onSaveDraft, i
     }
   };
 
+  const handleGenerateThumbnail = async () => {
+    if (!content.title) {
+      alert("Generate a script/idea first.");
+      return;
+    }
+    setLoading('thumbnail');
+    try {
+      const url = await generateThumbnail(content.title, activeProfile.brandingStyle);
+      setContent(prev => ({ ...prev, thumbnailUrl: url }));
+    } catch (error) {
+      alert("Thumbnail generation failed.");
+    } finally {
+      setLoading(null);
+    }
+  };
+
   const handleMagicCreate = async () => {
     if (!topic) return;
     setLoading('magic');
@@ -161,6 +177,13 @@ const StudioView: React.FC<StudioViewProps> = ({ profile, onPost, onSaveDraft, i
       setMotionStatus("Syncing Social Platforms...");
       const captions = await generatePlatformCaptions(currentContent.title, currentContent.script, selectedPlatforms, selectedModel);
       setSocialCaptions(captions);
+      setMagicProgress(90);
+
+      // 5. Generate Thumbnail
+      setMotionStatus("Designing Viral Thumbnail...");
+      const thumbnailUrl = await generateThumbnail(currentContent.title, activeProfile.brandingStyle);
+      currentContent = { ...currentContent, thumbnailUrl };
+      setContent(currentContent);
       setMagicProgress(100);
 
       alert("Magic Production Complete! Your content is ready for review and final synthesis.");
@@ -647,16 +670,14 @@ const StudioView: React.FC<StudioViewProps> = ({ profile, onPost, onSaveDraft, i
                     />
                   )}
                 </button>
-                {isAdvanced && (
-                  <button
-                    onClick={handleFindResources}
-                    disabled={!!loading || !topic}
-                    className="bg-zinc-950 border border-zinc-800 text-zinc-400 font-black px-6 py-4 rounded-2xl hover:border-indigo-500 hover:text-white transition-all flex items-center gap-2 disabled:opacity-50 active:scale-95"
-                  >
-                    {loading === 'resources' ? <Loader2 className="animate-spin w-5 h-5" /> : <Globe className="w-5 h-5" />}
-                    Find Resources
-                  </button>
-                )}
+                <button
+                  onClick={handleFindResources}
+                  disabled={!!loading || !topic}
+                  className={`${isAdvanced ? 'px-6 py-4' : 'px-12 py-6 text-xl w-full md:w-auto'} bg-zinc-950 border border-zinc-800 text-zinc-400 font-black rounded-2xl hover:border-indigo-500 hover:text-white transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95`}
+                >
+                  {loading === 'resources' ? <Loader2 className="animate-spin w-5 h-5" /> : <Globe className="w-5 h-5" />}
+                  Find Resources
+                </button>
               </div>
             </div>
 
@@ -775,6 +796,52 @@ const StudioView: React.FC<StudioViewProps> = ({ profile, onPost, onSaveDraft, i
 
                 {/* Synthesis column */}
                 <div className={`${isAdvanced ? 'lg:col-span-4' : 'w-full'} space-y-8`}>
+                  {/* Thumbnail Section */}
+                  <div className="bg-zinc-950 p-8 rounded-3xl border border-zinc-800 shadow-2xl relative overflow-hidden group">
+                    <div className="flex items-center justify-between mb-6">
+                      <div className="flex items-center gap-2 text-indigo-500">
+                        <ImageIcon className="w-4 h-4" />
+                        <span className="text-[10px] font-black uppercase tracking-[0.2em]">Viral Thumbnail</span>
+                      </div>
+                      <button 
+                        onClick={handleGenerateThumbnail}
+                        disabled={loading === 'thumbnail'}
+                        className="bg-zinc-900 border border-zinc-800 text-zinc-400 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest hover:text-white transition-all disabled:opacity-50"
+                      >
+                        {loading === 'thumbnail' ? 'Designing...' : 'Regenerate'}
+                      </button>
+                    </div>
+                    
+                    <div className="relative aspect-video rounded-2xl overflow-hidden bg-zinc-900 border border-zinc-800">
+                      {content.thumbnailUrl ? (
+                        <>
+                          <img 
+                            src={content.thumbnailUrl} 
+                            alt="Thumbnail" 
+                            className="w-full h-full object-cover transition-transform group-hover:scale-105 duration-700"
+                            referrerPolicy="no-referrer"
+                          />
+                          {process.env.MUAPI_API_KEY && (
+                            <div className="absolute top-3 right-3 bg-indigo-600 px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest shadow-xl">
+                              Midjourney Cinema
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center text-zinc-700 gap-3">
+                          <ImageIcon className="w-8 h-8 opacity-20" />
+                          <p className="text-[10px] font-black uppercase tracking-widest opacity-50">No Thumbnail Generated</p>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <p className="mt-4 text-[10px] text-zinc-500 italic leading-relaxed">
+                      {process.env.MUAPI_API_KEY 
+                        ? "Powered by Midjourney v6 via Muapi for ultra-realistic cinematic results."
+                        : "Powered by Gemini 2.5 Flash Image for high-speed creative assets."}
+                    </p>
+                  </div>
+
                   <div className="bg-zinc-950 p-6 rounded-3xl border border-zinc-800 shadow-xl">
                     <div className="flex items-center justify-between mb-4">
                       <h4 className="text-xs font-black uppercase tracking-widest text-indigo-500">Visual Blueprint</h4>
