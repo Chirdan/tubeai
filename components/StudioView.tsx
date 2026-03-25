@@ -290,22 +290,27 @@ const StudioView: React.FC<StudioViewProps> = ({ profile, onPost, onSaveDraft, i
     }
   };
 
-  const handleAnimateImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setAnimationImage(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleAnimateImage = async () => {
+    if (!animationImage) return;
+    
     await ensureApiKey();
     setLoading('video');
+    setMotionStatus("Synthesizing Motion...");
     try {
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const base64 = reader.result as string;
-        setAnimationImage(base64);
-        const prompt = veoPrompt || `Animate this scene beautifully, cinematic motion, 4k. Title: ${content.title || 'Untitled'}`;
-        const url = await animateImageVeo(base64, prompt, aspectRatio);
-        setContent(prev => ({ ...prev, videoUrl: url }));
-      };
-      reader.readAsDataURL(file);
+      const prompt = veoPrompt || `Animate this scene beautifully, cinematic motion, 4k. Title: ${content.title || 'Untitled'}`;
+      const url = await animateImageVeo(animationImage, prompt, aspectRatio);
+      setContent(prev => ({ ...prev, videoUrl: url }));
     } catch (error) {
       alert("Image animation failed.");
     } finally {
@@ -781,65 +786,117 @@ const StudioView: React.FC<StudioViewProps> = ({ profile, onPost, onSaveDraft, i
                   </div>
 
                   <div className="bg-zinc-950 p-6 rounded-3xl border border-zinc-800">
-                     <div className="flex items-center justify-between mb-4 text-orange-500">
-                        <h4 className="text-xs font-black uppercase tracking-widest">AI Double Synthesis</h4>
-                        <div className="flex items-center gap-2">
-                          <button 
-                            onClick={() => setAspectRatio(aspectRatio === '16:9' ? '9:16' : '16:9')} 
-                            className="text-[9px] bg-zinc-900 px-2 py-1 rounded text-zinc-500 font-bold hover:text-white transition-colors"
-                          >
-                            {aspectRatio}
-                          </button>
+                     <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-2 text-orange-500">
+                          <Video className="w-4 h-4" />
+                          <h4 className="text-xs font-black uppercase tracking-widest">Veo 3.1 Cinema</h4>
+                        </div>
+                        <div className="flex items-center gap-1 bg-zinc-900 p-1 rounded-xl border border-zinc-800">
                           <input 
                             type="file" 
                             ref={animationInputRef} 
-                            onChange={handleAnimateImage} 
+                            onChange={handleImageUpload} 
                             accept="image/*" 
                             className="hidden" 
                           />
                           <button 
-                            onClick={() => animationInputRef.current?.click()}
-                            className="p-1.5 bg-zinc-900 rounded-md text-zinc-500 hover:text-white transition-colors"
-                            title="Animate an image"
+                            onClick={() => setAspectRatio('16:9')} 
+                            className={`px-3 py-1 rounded-lg text-[10px] font-black transition-all ${aspectRatio === '16:9' ? 'bg-orange-600 text-white shadow-lg' : 'text-zinc-500 hover:text-zinc-300'}`}
                           >
-                            <Upload className="w-3.5 h-3.5" />
+                            16:9
+                          </button>
+                          <button 
+                            onClick={() => setAspectRatio('9:16')} 
+                            className={`px-3 py-1 rounded-lg text-[10px] font-black transition-all ${aspectRatio === '9:16' ? 'bg-orange-600 text-white shadow-lg' : 'text-zinc-500 hover:text-zinc-300'}`}
+                          >
+                            9:16
                           </button>
                         </div>
                      </div>
 
-                     <div className="mb-4">
+                     <div className="space-y-4 mb-6">
+                        <div className="grid grid-cols-2 gap-3">
+                          <button 
+                            onClick={() => animationInputRef.current?.click()}
+                            className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl bg-zinc-900 border border-zinc-800 hover:border-orange-500/50 transition-all group"
+                          >
+                            <div className="p-2 rounded-xl bg-zinc-950 text-zinc-500 group-hover:text-orange-500 transition-colors">
+                              <Upload className="w-5 h-5" />
+                            </div>
+                            <span className="text-[10px] font-black uppercase text-zinc-500 group-hover:text-zinc-300">Upload Base Image</span>
+                          </button>
+                          
+                          <div className="relative rounded-2xl bg-zinc-900 border border-zinc-800 overflow-hidden flex items-center justify-center">
+                            {animationImage ? (
+                              <>
+                                <img src={animationImage} className="w-full h-full object-cover opacity-50" />
+                                <button 
+                                  onClick={() => setAnimationImage(null)}
+                                  className="absolute top-2 right-2 p-1 bg-black/50 rounded-lg text-white hover:bg-red-500 transition-colors"
+                                >
+                                  <Save className="w-3 h-3 rotate-45" />
+                                </button>
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                  <span className="text-[8px] font-black uppercase bg-orange-600 px-2 py-0.5 rounded text-white">Ready to Animate</span>
+                                </div>
+                              </>
+                            ) : (
+                              <div className="text-center p-4">
+                                <ImageIcon className="w-5 h-5 text-zinc-800 mx-auto mb-1" />
+                                <p className="text-[8px] font-black text-zinc-700 uppercase">No Image Selected</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
                         <textarea
                           value={veoPrompt}
                           onChange={(e) => setVeoPrompt(e.target.value)}
-                          placeholder="Custom synthesis prompt (optional)..."
-                          className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-[10px] text-zinc-400 focus:border-orange-500 outline-none transition-colors h-16 resize-none"
+                          placeholder="Describe the motion or scene (optional)..."
+                          className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-4 text-[11px] text-zinc-400 focus:border-orange-500 outline-none transition-colors h-20 resize-none"
                         />
                      </div>
 
-                     <div className="aspect-video bg-zinc-900 rounded-2xl overflow-hidden border border-zinc-800 relative group flex items-center justify-center">
+                     <div className={`relative rounded-2xl overflow-hidden border border-zinc-800 bg-zinc-900 group flex items-center justify-center ${aspectRatio === '16:9' ? 'aspect-video' : 'aspect-[9/16] max-h-[400px] mx-auto'}`}>
                         {content.videoUrl ? (
-                          <video src={content.videoUrl} autoPlay loop muted className="w-full h-full object-cover" />
+                          <video 
+                            src={content.videoUrl} 
+                            autoPlay 
+                            loop 
+                            muted 
+                            playsInline
+                            className="w-full h-full object-cover" 
+                          />
                         ) : (
                           <div className="text-center p-6">
-                            <Video className="w-8 h-8 text-zinc-800 mx-auto mb-2" />
-                            <p className="text-[10px] font-black text-zinc-700 uppercase tracking-widest">Clone Offline</p>
+                            <div className="w-12 h-12 rounded-full bg-zinc-950 flex items-center justify-center mx-auto mb-3 border border-zinc-800">
+                              <Video className="w-6 h-6 text-zinc-800" />
+                            </div>
+                            <p className="text-[10px] font-black text-zinc-700 uppercase tracking-widest">Cinema Offline</p>
                           </div>
                         )}
 
                         {loading === 'video' && (
-                          <div className="absolute inset-0 bg-black/95 flex flex-col items-center justify-center p-6 text-center">
-                             <Loader2 className="w-10 h-10 animate-spin text-red-600 mb-4" />
-                             <p className="text-xs font-black uppercase text-white tracking-[0.2em]">{motionStatus}</p>
+                          <div className="absolute inset-0 bg-black/95 flex flex-col items-center justify-center p-6 text-center z-20">
+                             <div className="relative mb-6">
+                               <Loader2 className="w-12 h-12 animate-spin text-orange-600" />
+                               <Sparkles className="absolute -top-2 -right-2 w-5 h-5 text-orange-400 animate-pulse" />
+                             </div>
+                             <p className="text-xs font-black uppercase text-white tracking-[0.2em] mb-2">{motionStatus}</p>
+                             <div className="w-32 h-1 bg-zinc-800 rounded-full overflow-hidden">
+                               <div className="h-full bg-orange-600 animate-shimmer" style={{ width: '60%' }} />
+                             </div>
                           </div>
                         )}
 
-                        <div className="absolute bottom-4 left-4 right-4 translate-y-full group-hover:translate-y-0 transition-transform">
+                        <div className="absolute inset-x-4 bottom-4 translate-y-full group-hover:translate-y-0 transition-all duration-300 z-10">
                            <button 
-                             onClick={handleGenerateVeo}
-                             disabled={!!loading || !content.storyboard}
-                             className="w-full bg-red-600 text-white py-3 rounded-xl text-xs font-black uppercase tracking-widest shadow-xl shadow-red-600/20"
+                             onClick={animationImage ? handleAnimateImage : handleGenerateVeo}
+                             disabled={!!loading || (!content.storyboard && !animationImage)}
+                             className="w-full bg-orange-600 text-white py-4 rounded-xl text-xs font-black uppercase tracking-widest shadow-2xl shadow-orange-600/30 hover:bg-orange-500 active:scale-95 transition-all flex items-center justify-center gap-2"
                            >
-                             Synthesize AI Double
+                             {animationImage ? <Sparkles className="w-4 h-4" /> : <Video className="w-4 h-4" />}
+                             {animationImage ? 'Animate Selected Image' : 'Synthesize from Storyboard'}
                            </button>
                         </div>
                      </div>
