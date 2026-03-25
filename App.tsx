@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar';
 import BrandingView from './components/BrandingView';
 import StudioView from './components/StudioView';
 import DashboardView from './components/DashboardView';
+import AnalyticsView from './components/AnalyticsView';
 import { ViewType, ChannelProfile, VideoContent } from './types';
 import { BarChart3, Clock } from 'lucide-react';
 
@@ -33,7 +34,7 @@ const App: React.FC = () => {
   const renderView = () => {
     switch (currentView) {
       case 'dashboard':
-        return <DashboardView profile={channelProfile} publishedVideos={publishedVideos} />;
+        return <DashboardView profile={channelProfile} publishedVideos={publishedVideos} setView={setView} />;
       case 'branding':
         return <BrandingView profile={channelProfile} onUpdate={setChannelProfile} />;
       case 'studio':
@@ -46,13 +47,7 @@ const App: React.FC = () => {
           />
         );
       case 'analytics':
-        return (
-          <div className="flex flex-col items-center justify-center h-[60vh] text-zinc-500">
-            <BarChart3 className="w-16 h-16 mb-4 opacity-20" />
-            <h3 className="text-xl font-bold text-white">Advanced Insights</h3>
-            <p>Gathering enough data points to generate meaningful analytics...</p>
-          </div>
-        );
+        return <AnalyticsView profile={channelProfile} publishedVideos={publishedVideos} />;
       case 'media':
         return (
           <div className="space-y-12">
@@ -99,7 +94,7 @@ const App: React.FC = () => {
           </div>
         );
       default:
-        return <DashboardView profile={channelProfile} publishedVideos={publishedVideos} />;
+        return <DashboardView profile={channelProfile} publishedVideos={publishedVideos} setView={setView} />;
     }
   };
 
