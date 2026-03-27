@@ -5,6 +5,7 @@ import BrandingView from './components/BrandingView';
 import StudioView from './components/StudioView';
 import DashboardView from './components/DashboardView';
 import AnalyticsView from './components/AnalyticsView';
+import { Toaster } from 'sonner';
 import { ViewType, ChannelProfile, VideoContent } from './types';
 import { BarChart3, Clock, Menu } from 'lucide-react';
 
@@ -101,6 +102,7 @@ const App: React.FC = () => {
 
   return (
     <div className="flex h-screen bg-[#060606] text-white overflow-hidden font-inter">
+      <Toaster position="top-center" richColors />
       <Sidebar 
         currentView={currentView} 
         setView={setView} 

@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
+import { toast } from 'sonner';
 import { ChannelProfile, AIModel } from '../types';
 import { generateChannelBranding, getAvailableModels } from '../services/geminiService';
 import { Sparkles, Save, RefreshCw, Type as TypeIcon, AlignLeft, Palette, User, Mic, Trash2, Plus, Cpu } from 'lucide-react';
@@ -31,7 +32,7 @@ const BrandingView: React.FC<BrandingViewProps> = ({ profile, onUpdate }) => {
       setLocalProfile({ ...result, clonedVoice: localProfile?.clonedVoice, clonedLikeness: localProfile?.clonedLikeness });
     } catch (error) {
       console.error(error);
-      alert("Something went wrong while generating branding.");
+      toast.error("Something went wrong while generating branding.");
     } finally {
       setLoading(false);
     }
@@ -64,7 +65,7 @@ const BrandingView: React.FC<BrandingViewProps> = ({ profile, onUpdate }) => {
   const handleSave = () => {
     if (localProfile) {
       onUpdate({ ...localProfile, niche });
-      alert("Channel Profile Saved!");
+      toast.success("Channel Profile Saved!");
     }
   };
 

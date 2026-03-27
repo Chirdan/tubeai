@@ -275,7 +275,14 @@ export const generateClonedVideoVeo = async (
 
   const videoData = operation.response?.generatedVideos?.[0]?.video;
   const downloadLink = videoData?.uri;
-  const response = await fetch(`${downloadLink}&key=${apiKey}`);
+  if (!downloadLink) throw new Error("Video download link not found.");
+
+  const response = await fetch(downloadLink, {
+    method: 'GET',
+    headers: {
+      'x-goog-api-key': apiKey,
+    },
+  });
   const blob = await response.blob();
   return { uri: videoData?.uri || '', blobUrl: URL.createObjectURL(blob) };
 };
@@ -310,7 +317,14 @@ export const animateImageVeo = async (
 
   const videoData = operation.response?.generatedVideos?.[0]?.video;
   const downloadLink = videoData?.uri;
-  const response = await fetch(`${downloadLink}&key=${apiKey}`);
+  if (!downloadLink) throw new Error("Video download link not found.");
+
+  const response = await fetch(downloadLink, {
+    method: 'GET',
+    headers: {
+      'x-goog-api-key': apiKey,
+    },
+  });
   const blob = await response.blob();
   return { uri: videoData?.uri || '', blobUrl: URL.createObjectURL(blob) };
 };

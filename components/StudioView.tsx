@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
+import { toast } from 'sonner';
 import { ChannelProfile, VideoContent, PlatformCaption, GroundingSource, FreeAsset, AIModel } from '../types';
 import { 
   generateContentIdeaWithSearch, 
@@ -117,7 +118,7 @@ const StudioView: React.FC<StudioViewProps> = ({ profile, onPost, onSaveDraft, i
       const { content: result, sources } = await generateContentIdeaWithSearch(activeProfile, topic, selectedModel);
       setContent(prev => ({ ...prev, ...result, groundingSources: sources }));
     } catch (error) {
-      alert("Search grounding failed.");
+      toast.error("Search grounding failed.");
     } finally {
       setLoading(null);
     }
@@ -131,7 +132,7 @@ const StudioView: React.FC<StudioViewProps> = ({ profile, onPost, onSaveDraft, i
       setThinkingResult(result);
       setContent(prev => ({ ...prev, thinkingResult: result }));
     } catch (error) {
-      alert("Deep Thinking failed.");
+      toast.error("Deep Thinking failed.");
     } finally {
       setLoading(null);
     }
@@ -139,7 +140,7 @@ const StudioView: React.FC<StudioViewProps> = ({ profile, onPost, onSaveDraft, i
 
   const handleGenerateThumbnail = async () => {
     if (!content.title) {
-      alert("Generate a script/idea first.");
+      toast.error("Generate a script/idea first.");
       return;
     }
     setLoading('thumbnail');
@@ -147,7 +148,7 @@ const StudioView: React.FC<StudioViewProps> = ({ profile, onPost, onSaveDraft, i
       const url = await generateThumbnail(content.title, activeProfile.brandingStyle);
       setContent(prev => ({ ...prev, thumbnailUrl: url }));
     } catch (error) {
-      alert("Thumbnail generation failed.");
+      toast.error("Thumbnail generation failed.");
     } finally {
       setLoading(null);
     }
@@ -194,10 +195,10 @@ const StudioView: React.FC<StudioViewProps> = ({ profile, onPost, onSaveDraft, i
       setContent(currentContent);
       setMagicProgress(100);
 
-      alert("Magic Production Complete! Your content is ready for review and final synthesis.");
+      toast.success("Magic Production Complete! Your content is ready for review and final synthesis.");
     } catch (error) {
       console.error("Magic Create failed:", error);
-      alert("Magic Create encountered an error. Some steps may have been skipped.");
+      toast.error("Magic Create encountered an error. Some steps may have been skipped.");
     } finally {
       setLoading(null);
       setMagicProgress(0);
@@ -244,7 +245,7 @@ const StudioView: React.FC<StudioViewProps> = ({ profile, onPost, onSaveDraft, i
       };
       reader.readAsDataURL(file);
     } catch (error) {
-      alert("Video analysis failed.");
+      toast.error("Video analysis failed.");
     } finally {
       setLoading(null);
     }
@@ -252,7 +253,7 @@ const StudioView: React.FC<StudioViewProps> = ({ profile, onPost, onSaveDraft, i
 
   const handleGenerateStoryboard = async () => {
     if (!content.title || !content.script) {
-      alert("Generate a script first.");
+      toast.error("Generate a script first.");
       return;
     }
     setLoading('storyboard');
@@ -260,7 +261,7 @@ const StudioView: React.FC<StudioViewProps> = ({ profile, onPost, onSaveDraft, i
       const result = await generateStoryboard(content.title, content.script, selectedModel);
       setContent(prev => ({ ...prev, storyboard: result }));
     } catch (error) {
-      alert("Storyboard generation failed.");
+      toast.error("Storyboard generation failed.");
     } finally {
       setLoading(null);
     }
@@ -276,7 +277,7 @@ const StudioView: React.FC<StudioViewProps> = ({ profile, onPost, onSaveDraft, i
 
   const handleCloneVoice = async () => {
     if (!content.script) {
-      alert("Generate a script first.");
+      toast.error("Generate a script first.");
       return;
     }
     setLoading('audio');
@@ -284,7 +285,7 @@ const StudioView: React.FC<StudioViewProps> = ({ profile, onPost, onSaveDraft, i
       const url = await generateVoiceCloneTTS(content.script, selectedVoice);
       setContent(prev => ({ ...prev, audioUrl: url }));
     } catch (error) {
-      alert("Voice synthesis failed.");
+      toast.error("Voice synthesis failed.");
     } finally {
       setLoading(null);
     }
@@ -297,7 +298,7 @@ const StudioView: React.FC<StudioViewProps> = ({ profile, onPost, onSaveDraft, i
       const audio = new Audio(url);
       audio.play();
     } catch (error) {
-      alert("Voice preview failed.");
+      toast.error("Voice preview failed.");
     } finally {
       setLoading(null);
     }
@@ -305,7 +306,7 @@ const StudioView: React.FC<StudioViewProps> = ({ profile, onPost, onSaveDraft, i
 
   const handleGenerateVeo = async () => {
     if (!content.title && !analysisResult) {
-      alert("Generate a script or upload a reference video first.");
+      toast.error("Generate a script or upload a reference video first.");
       return;
     }
     await ensureApiKey();
@@ -315,46 +316,13 @@ const StudioView: React.FC<StudioViewProps> = ({ profile, onPost, onSaveDraft, i
         ? `A cinematic animation inspired by this reference: ${analysisResult}`
         : `A cinematic video featuring the creator. Topic: ${content.title}. Style: ${activeProfile.brandingStyle}. Scene details: ${content.storyboard?.substring(0, 500)}`);
       
-      const apiKey = getGeminiKey();
-      const ai = new GoogleGenAI({ apiKey });
+      const result = await generateClonedVideoVeo(prompt, activeProfile.clonedLikeness || [], aspectRatio);
       
-      const referenceImagesPayload: VideoGenerationReferenceImage[] = (activeProfile.clonedLikeness || []).map(img => ({
-        image: {
-          imageBytes: img.split(',')[1],
-          mimeType: 'image/png',
-        },
-        referenceType: VideoGenerationReferenceType.ASSET,
-      }));
-
-      const useLikeness = referenceImagesPayload.length > 0;
-      const model = useLikeness ? 'veo-3.1-generate-preview' : 'veo-3.1-fast-generate-preview';
-
-      let operation = await ai.models.generateVideos({
-        model: model,
-        prompt: prompt,
-        config: {
-          numberOfVideos: 1,
-          resolution: '720p',
-          aspectRatio: aspectRatio,
-          ...(useLikeness ? { referenceImages: referenceImagesPayload } : {})
-        }
-      });
-
-      while (!operation.done) {
-        await new Promise(resolve => setTimeout(resolve, 10000));
-        operation = await ai.operations.getVideosOperation({ operation: operation });
-      }
-
-      const videoData = operation.response?.generatedVideos?.[0]?.video;
-      const downloadLink = videoData?.uri;
-      const response = await fetch(`${downloadLink}&key=${apiKey}`);
-      const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      
-      setLastOperationVideo({ uri: videoData?.uri || '', blobUrl });
-      setContent(prev => ({ ...prev, videoUrl: blobUrl }));
+      setLastOperationVideo(result);
+      setContent(prev => ({ ...prev, videoUrl: result.blobUrl }));
     } catch (error) {
-      alert("Veo generation failed.");
+      console.error(error);
+      toast.error("Veo generation failed.");
     } finally {
       setLoading(null);
     }
@@ -373,7 +341,7 @@ const StudioView: React.FC<StudioViewProps> = ({ profile, onPost, onSaveDraft, i
       setLastOperationVideo(result);
       setContent(prev => ({ ...prev, videoUrl: result.blobUrl }));
     } catch (error) {
-      alert("Video extension failed.");
+      toast.error("Video extension failed.");
     } finally {
       setLoading(null);
     }
@@ -395,7 +363,7 @@ const StudioView: React.FC<StudioViewProps> = ({ profile, onPost, onSaveDraft, i
       };
       reader.readAsDataURL(file);
     } catch (error) {
-      alert("Video analysis failed.");
+      toast.error("Video analysis failed.");
     } finally {
       setLoading(null);
     }
@@ -424,7 +392,7 @@ const StudioView: React.FC<StudioViewProps> = ({ profile, onPost, onSaveDraft, i
       setLastOperationVideo(result);
       setContent(prev => ({ ...prev, videoUrl: result.blobUrl }));
     } catch (error) {
-      alert("Image animation failed.");
+      toast.error("Image animation failed.");
     } finally {
       setLoading(null);
     }
@@ -437,7 +405,7 @@ const StudioView: React.FC<StudioViewProps> = ({ profile, onPost, onSaveDraft, i
       const result = await generatePlatformCaptions(content.title, content.script, selectedPlatforms, selectedModel);
       setSocialCaptions(result);
     } catch (error) {
-      alert("Social adaptation failed.");
+      toast.error("Social adaptation failed.");
     } finally {
       setLoading(null);
     }
@@ -452,7 +420,7 @@ const StudioView: React.FC<StudioViewProps> = ({ profile, onPost, onSaveDraft, i
       status: 'draft',
       createdAt: new Date().toISOString()
     });
-    alert("Draft saved.");
+    toast.success("Draft saved.");
   };
 
   const handlePost = () => {
@@ -465,7 +433,7 @@ const StudioView: React.FC<StudioViewProps> = ({ profile, onPost, onSaveDraft, i
         status: 'published',
         createdAt: new Date().toISOString()
       });
-      alert("Project published!");
+      toast.success("Project published!");
       setContent({});
       setTopic('');
       setSocialCaptions([]);
