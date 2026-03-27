@@ -3,6 +3,24 @@ import { GoogleGenAI, Type, Modality, VideoGenerationReferenceType, VideoGenerat
 import { HfInference } from "@huggingface/inference";
 import { ChannelProfile, VideoContent, PlatformCaption, GroundingSource, FreeAsset, AIModel } from "../types";
 
+// Robust API key retrieval
+const getApiKey = (keyName: string): string => {
+  // Check process.env (injected by Vite define)
+  const processKey = process.env[keyName];
+  if (processKey) return processKey;
+
+  // Check import.meta.env (Vite standard)
+  const meta = (import.meta as any).env;
+  const metaKey = meta?.[`VITE_${keyName}`] || meta?.[keyName];
+  if (metaKey) return metaKey;
+
+  return "";
+};
+
+export const getGeminiKey = () => getApiKey('GEMINI_API_KEY') || getApiKey('API_KEY');
+const getHFKey = () => getApiKey('HUGGINGFACE_API_KEY');
+const getMuapiKey = () => getApiKey('MUAPI_API_KEY');
+
 // Guideline: Implement manual base64 decoding for raw PCM audio
 function decodeBase64(base64: string) {
   const binaryString = atob(base64);
@@ -34,8 +52,9 @@ async function decodeAudioData(
 }
 
 const generateWithHF = async (model: string, prompt: string): Promise<string> => {
-  const apiKey = process.env.HUGGINGFACE_API_KEY;
+  const apiKey = getHFKey();
   if (!apiKey) {
+    console.error("Hugging Face API Key missing");
     throw new Error("HUGGINGFACE_API_KEY is missing. Please add it to your project secrets in the Settings menu.");
   }
   const hf = new HfInference(apiKey);
@@ -63,7 +82,12 @@ const generateWithHF = async (model: string, prompt: string): Promise<string> =>
 };
 
 export const generateChannelBranding = async (niche: string): Promise<ChannelProfile> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = getGeminiKey();
+  if (!apiKey) {
+    console.error("Gemini API Key missing in generateChannelBranding");
+    throw new Error("Gemini API Key missing. Please check your environment variables.");
+  }
+  const ai = new GoogleGenAI({ apiKey });
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
     contents: `Suggest a YouTube channel profile for the niche: "${niche}".`,
@@ -91,7 +115,9 @@ export const generateContentIdeaWithSearch = async (channel: ChannelProfile, top
   Include title, description, keywords, and a short script. Return the result in JSON format with keys: title, description, script, tags (array).`;
 
   if (model.startsWith('gemini')) {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const apiKey = getGeminiKey();
+    if (!apiKey) throw new Error("Gemini API Key missing.");
+    const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
       model: model,
       contents: prompt,
@@ -134,7 +160,9 @@ export const generateContentIdeaWithSearch = async (channel: ChannelProfile, top
 };
 
 export const generateVoiceCloneTTS = async (script: string, voiceName: string): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = getGeminiKey();
+  if (!apiKey) throw new Error("Gemini API Key missing.");
+  const ai = new GoogleGenAI({ apiKey });
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash-preview-tts",
     contents: [{ parts: [{ text: `Read the following script naturally and professionally: ${script}` }] }],
@@ -211,8 +239,10 @@ export const generateClonedVideoVeo = async (
   prompt: string, 
   likenessImages: string[], 
   aspectRatio: '16:9' | '9:16' = '16:9'
-): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+): Promise<{ uri: string, blobUrl: string }> => {
+  const apiKey = getGeminiKey();
+  if (!apiKey) throw new Error("Gemini API Key missing.");
+  const ai = new GoogleGenAI({ apiKey });
   
   // Explicitly type the reference images payload and use the correct enum
   const referenceImagesPayload: VideoGenerationReferenceImage[] = likenessImages.map(img => ({
@@ -243,18 +273,21 @@ export const generateClonedVideoVeo = async (
     operation = await ai.operations.getVideosOperation({ operation: operation });
   }
 
-  const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
-  const response = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
+  const videoData = operation.response?.generatedVideos?.[0]?.video;
+  const downloadLink = videoData?.uri;
+  const response = await fetch(`${downloadLink}&key=${apiKey}`);
   const blob = await response.blob();
-  return URL.createObjectURL(blob);
+  return { uri: videoData?.uri || '', blobUrl: URL.createObjectURL(blob) };
 };
 
 export const animateImageVeo = async (
   imageBase64: string,
   prompt: string = "",
   aspectRatio: '16:9' | '9:16' = '16:9'
-): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+): Promise<{ uri: string, blobUrl: string }> => {
+  const apiKey = getGeminiKey();
+  if (!apiKey) throw new Error("Gemini API Key missing.");
+  const ai = new GoogleGenAI({ apiKey });
   
   let operation = await ai.models.generateVideos({
     model: 'veo-3.1-fast-generate-preview',
@@ -275,15 +308,52 @@ export const animateImageVeo = async (
     operation = await ai.operations.getVideosOperation({ operation: operation });
   }
 
-  const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
-  const response = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
+  const videoData = operation.response?.generatedVideos?.[0]?.video;
+  const downloadLink = videoData?.uri;
+  const response = await fetch(`${downloadLink}&key=${apiKey}`);
   const blob = await response.blob();
-  return URL.createObjectURL(blob);
+  return { uri: videoData?.uri || '', blobUrl: URL.createObjectURL(blob) };
+};
+
+export const extendVideoVeo = async (
+  videoUri: string,
+  prompt: string,
+  aspectRatio: '16:9' | '9:16' = '16:9'
+): Promise<{ uri: string, blobUrl: string }> => {
+  const apiKey = getGeminiKey();
+  if (!apiKey) throw new Error("Gemini API Key missing.");
+  const ai = new GoogleGenAI({ apiKey });
+  
+  let operation = await ai.models.generateVideos({
+    model: 'veo-3.1-generate-preview',
+    prompt: prompt || "Continue the scene naturally.",
+    video: {
+      uri: videoUri
+    },
+    config: {
+      numberOfVideos: 1,
+      resolution: '720p',
+      aspectRatio: aspectRatio,
+    }
+  });
+
+  while (!operation.done) {
+    await new Promise(resolve => setTimeout(resolve, 10000));
+    operation = await ai.operations.getVideosOperation({ operation: operation });
+  }
+
+  const videoData = operation.response?.generatedVideos?.[0]?.video;
+  const downloadLink = videoData?.uri;
+  const response = await fetch(`${downloadLink}&key=${apiKey}`);
+  const blob = await response.blob();
+  return { uri: videoData?.uri || '', blobUrl: URL.createObjectURL(blob) };
 };
 
 export const thinkComplexQuery = async (query: string, model: AIModel = 'gemini-3.1-pro-preview'): Promise<string> => {
   if (model.startsWith('gemini')) {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const apiKey = getGeminiKey();
+    if (!apiKey) throw new Error("Gemini API Key missing.");
+    const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
       model: 'gemini-3.1-pro-preview', // Always use pro for complex thinking if gemini is selected
       contents: query,
@@ -298,7 +368,9 @@ export const thinkComplexQuery = async (query: string, model: AIModel = 'gemini-
 };
 
 export const analyzeVideo = async (videoBase64: string, mimeType: string, prompt: string): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = getGeminiKey();
+  if (!apiKey) throw new Error("Gemini API Key missing.");
+  const ai = new GoogleGenAI({ apiKey });
   const response = await ai.models.generateContent({
     model: 'gemini-3-pro-preview',
     contents: {
@@ -317,23 +389,24 @@ export const analyzeVideo = async (videoBase64: string, mimeType: string, prompt
 };
 
 export const generateThumbnail = async (title: string, style: string): Promise<string> => {
+  const muapiKey = getMuapiKey();
+  const geminiKey = getGeminiKey();
+
   // Check if Muapi API key is available for high-quality Midjourney generation
-  if (process.env.MUAPI_API_KEY) {
+  if (muapiKey) {
     try {
       const prompt = `High-quality YouTube thumbnail for a video titled "${title}". Style: ${style}. Vibrant colors, eye-catching text placement, 4k, cinematic --ar 16:9`;
-      const response = await fetch('https://api.muapi.com/v1/midjourney/imagine', {
+      const response = await fetch('https://api.muapi.io/v1/midjourney/imagine', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.MUAPI_API_KEY}`
+          'Authorization': `Bearer ${muapiKey}`
         },
         body: JSON.stringify({ prompt })
       });
       
       if (response.ok) {
         const data = await response.json();
-        // Muapi usually returns a task ID or a direct image URL depending on the specific implementation
-        // For this implementation, we assume it returns an image URL in data.image_url or similar
         if (data.image_url) return data.image_url;
         if (data.url) return data.url;
       }
@@ -343,7 +416,8 @@ export const generateThumbnail = async (title: string, style: string): Promise<s
   }
 
   // Fallback to Gemini 2.5 Flash Image
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  if (!geminiKey) throw new Error("Gemini API Key missing for thumbnail generation.");
+  const ai = new GoogleGenAI({ apiKey: geminiKey });
   const response = await ai.models.generateContent({
     model: 'gemini-2.5-flash-image',
     contents: {
@@ -370,7 +444,9 @@ export const generateStoryboard = async (title: string, script: string, model: A
   Script: ${script}`;
 
   if (model.startsWith('gemini')) {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const apiKey = getGeminiKey();
+    if (!apiKey) throw new Error("Gemini API Key missing.");
+    const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
       model: 'gemini-3.1-flash-preview',
       contents: prompt
@@ -390,7 +466,9 @@ export const generatePlatformCaptions = async (title: string, script: string, pl
   Return the result in JSON format as an array of objects with keys: platform, caption.`;
 
   if (model.startsWith('gemini')) {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const apiKey = getGeminiKey();
+    if (!apiKey) throw new Error("Gemini API Key missing.");
+    const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
       model: 'gemini-3.1-flash-preview',
       contents: prompt,
@@ -432,7 +510,9 @@ export const generateTopicSuggestions = async (channel: ChannelProfile, model: A
   Return only a JSON array of 5 strings.`;
 
   if (model.startsWith('gemini')) {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const apiKey = getGeminiKey();
+    if (!apiKey) throw new Error("Gemini API Key missing.");
+    const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
       model: model,
       contents: prompt,
@@ -468,7 +548,9 @@ export const generateTopicSuggestions = async (channel: ChannelProfile, model: A
 };
 
 export const searchFreeAssets = async (topic: string): Promise<FreeAsset[]> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = getGeminiKey();
+  if (!apiKey) throw new Error("Gemini API Key missing.");
+  const ai = new GoogleGenAI({ apiKey });
   const prompt = `Find 6 high-quality, free-to-use content materials (stock images, videos, or music) related to the topic: "${topic}". 
   Look for resources from reputable sites like Pexels, Pixabay, Unsplash, or Free Music Archive.
   Return the result as a JSON array of objects with keys: title, url, type (one of: 'image', 'video', 'audio', 'other'), source.`;

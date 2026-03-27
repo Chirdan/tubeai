@@ -6,7 +6,7 @@ import StudioView from './components/StudioView';
 import DashboardView from './components/DashboardView';
 import AnalyticsView from './components/AnalyticsView';
 import { ViewType, ChannelProfile, VideoContent } from './types';
-import { BarChart3, Clock } from 'lucide-react';
+import { BarChart3, Clock, Menu } from 'lucide-react';
 
 const App: React.FC = () => {
   const [currentView, setView] = useState<ViewType>('dashboard');
@@ -14,6 +14,7 @@ const App: React.FC = () => {
   const [publishedVideos, setPublishedVideos] = useState<VideoContent[]>([]);
   const [draftVideos, setDraftVideos] = useState<VideoContent[]>([]);
   const [activeDraft, setActiveDraft] = useState<VideoContent | undefined>(undefined);
+  const [isSidebarOpen, setSidebarOpen] = useState(false);
 
   const handlePost = (video: VideoContent) => {
     setPublishedVideos(prev => [video, ...prev]);
@@ -52,10 +53,10 @@ const App: React.FC = () => {
         return (
           <div className="space-y-12">
             <div className="space-y-6">
-              <h3 className="text-2xl font-black uppercase tracking-widest flex items-center gap-2">
+              <h3 className="text-xl md:text-2xl font-black uppercase tracking-widest flex items-center gap-2">
                 <Clock className="w-6 h-6 text-zinc-500" /> Drafts
               </h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
                 {draftVideos.map(v => (
                   <div 
                     key={v.id} 
@@ -71,13 +72,13 @@ const App: React.FC = () => {
                     <p className="text-xs font-bold truncate px-1 text-zinc-300">{v.title || 'Untitled Project'}</p>
                   </div>
                 ))}
-                {draftVideos.length === 0 && <p className="col-span-full text-zinc-600 italic">No work-in-progress drafts.</p>}
+                {draftVideos.length === 0 && <p className="col-span-full text-zinc-600 italic text-sm">No work-in-progress drafts.</p>}
               </div>
             </div>
 
             <div className="space-y-6">
-              <h3 className="text-2xl font-black uppercase tracking-widest">Published Media</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
+              <h3 className="text-xl md:text-2xl font-black uppercase tracking-widest">Published Media</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
                 {publishedVideos.map(v => (
                   <div key={v.id} className="space-y-3 group">
                     <div className="aspect-video bg-zinc-900 rounded-2xl overflow-hidden border border-zinc-800 relative">
@@ -87,7 +88,7 @@ const App: React.FC = () => {
                   </div>
                 ))}
                 {publishedVideos.length === 0 && (
-                   <p className="col-span-full py-10 text-zinc-600 italic">Your AI media library is empty.</p>
+                   <p className="col-span-full py-10 text-zinc-600 italic text-sm">Your AI media library is empty.</p>
                 )}
               </div>
             </div>
@@ -100,32 +101,45 @@ const App: React.FC = () => {
 
   return (
     <div className="flex h-screen bg-[#060606] text-white overflow-hidden font-inter">
-      <Sidebar currentView={currentView} setView={setView} />
+      <Sidebar 
+        currentView={currentView} 
+        setView={setView} 
+        isOpen={isSidebarOpen} 
+        onClose={() => setSidebarOpen(false)} 
+      />
       
       <main className="flex-1 overflow-y-auto relative">
-        <header className="sticky top-0 z-30 bg-[#060606]/80 backdrop-blur-md border-b border-zinc-900 px-8 py-4 flex items-center justify-between">
+        <header className="sticky top-0 z-30 bg-[#060606]/80 backdrop-blur-md border-b border-zinc-900 px-4 md:px-8 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <h2 className="text-sm font-black uppercase tracking-[0.3em] text-zinc-500">{currentView}</h2>
+            <button 
+              onClick={() => setSidebarOpen(true)}
+              className="lg:hidden p-2 -ml-2 text-zinc-400 hover:text-white transition-colors"
+            >
+              <Menu className="w-6 h-6" />
+            </button>
+            <h2 className="text-[10px] md:text-sm font-black uppercase tracking-[0.2em] md:tracking-[0.3em] text-zinc-500">{currentView}</h2>
             {channelProfile && (
-              <div className="flex items-center gap-2 px-3 py-1 bg-zinc-900 rounded-full border border-zinc-800">
+              <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-zinc-900 rounded-full border border-zinc-800">
                 <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
                 <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">{channelProfile.name}</span>
               </div>
             )}
           </div>
-          <div className="flex items-center gap-6">
-            <div className="flex -space-x-3">
-               {[1,2,3].map(i => (
-                 <img key={i} src={`https://picsum.photos/32/32?random=${i}`} className="w-8 h-8 rounded-full border-2 border-[#060606]" />
+          <div className="flex items-center gap-3 md:gap-6">
+            <div className="hidden xs:flex -space-x-3">
+               {['A', 'B', 'C'].map((char, i) => (
+                 <div key={i} className="w-6 h-6 md:w-8 md:h-8 rounded-full border-2 border-[#060606] bg-zinc-800 flex items-center justify-center text-[10px] font-bold text-zinc-500 uppercase">
+                   {char}
+                 </div>
                ))}
             </div>
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-zinc-800 to-zinc-950 border border-zinc-800 flex items-center justify-center">
-              <div className="w-4 h-4 bg-red-600 rounded-full shadow-[0_0_10px_rgba(220,38,38,0.5)]" />
+            <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl md:rounded-2xl bg-gradient-to-tr from-zinc-800 to-zinc-950 border border-zinc-800 flex items-center justify-center">
+              <div className="w-3 h-3 md:w-4 md:h-4 bg-red-600 rounded-full shadow-[0_0_10px_rgba(220,38,38,0.5)]" />
             </div>
           </div>
         </header>
 
-        <div className="p-8 pb-24">
+        <div className="p-4 md:p-8 pb-24">
           {renderView()}
         </div>
       </main>

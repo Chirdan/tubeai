@@ -78,7 +78,7 @@ const AnalyticsView: React.FC<AnalyticsViewProps> = ({ profile, publishedVideos 
   }
 
   return (
-    <div className="space-y-8 pb-20">
+    <div className="space-y-8 pb-20" style={{ contentVisibility: 'auto' }}>
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-2xl font-black uppercase tracking-widest text-white">Neural Insights</h3>
@@ -94,7 +94,7 @@ const AnalyticsView: React.FC<AnalyticsViewProps> = ({ profile, publishedVideos 
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
         {[
           { label: 'Total Views', value: `${(totalViews / 1000).toFixed(1)}K`, icon: Eye, trend: '+14.2%', color: 'text-blue-500' },
           { label: 'Watch Time (Hrs)', value: totalWatchTime.toString(), icon: Clock, trend: '+8.4%', color: 'text-purple-500' },
@@ -105,38 +105,38 @@ const AnalyticsView: React.FC<AnalyticsViewProps> = ({ profile, publishedVideos 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.1 }}
-            className="bg-zinc-900/50 border border-zinc-800 p-8 rounded-3xl"
+            className="bg-zinc-900/50 border border-zinc-800 p-6 md:p-8 rounded-3xl"
           >
             <div className="flex justify-between items-start mb-4">
-              <div className={`p-3 rounded-2xl bg-zinc-950 border border-zinc-800 ${stat.color}`}>
-                <stat.icon className="w-6 h-6" />
+              <div className={`p-2 md:p-3 rounded-xl md:rounded-2xl bg-zinc-950 border border-zinc-800 ${stat.color}`}>
+                <stat.icon className="w-5 h-5 md:w-6 md:h-6" />
               </div>
-              <div className="flex items-center gap-1 text-xs font-black text-green-500">
+              <div className="flex items-center gap-1 text-[10px] md:text-xs font-black text-green-500">
                 <TrendingUp className="w-3 h-3" /> {stat.trend}
               </div>
             </div>
-            <p className="text-zinc-500 text-xs font-black uppercase tracking-widest">{stat.label}</p>
-            <p className="text-4xl font-black text-white mt-2 tracking-tight">{stat.value}</p>
+            <p className="text-zinc-500 text-[10px] md:text-xs font-black uppercase tracking-widest">{stat.label}</p>
+            <p className="text-2xl md:text-4xl font-black text-white mt-1 md:mt-2 tracking-tight">{stat.value}</p>
           </motion.div>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 bg-zinc-900/50 border border-zinc-800 rounded-3xl p-8">
-          <div className="flex items-center justify-between mb-8">
-            <h4 className="font-black text-white uppercase tracking-widest text-sm">Audience Growth</h4>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
+        <div className="lg:col-span-2 bg-zinc-900/50 border border-zinc-800 rounded-3xl p-6 md:p-8">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 md:mb-8 gap-4">
+            <h4 className="font-black text-white uppercase tracking-widest text-xs md:text-sm">Audience Growth</h4>
             <div className="flex gap-4">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-red-500" />
-                <span className="text-[10px] font-black text-zinc-500 uppercase">Views</span>
+                <span className="text-[9px] md:text-[10px] font-black text-zinc-500 uppercase">Views</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-blue-500" />
-                <span className="text-[10px] font-black text-zinc-500 uppercase">Watch Time</span>
+                <span className="text-[9px] md:text-[10px] font-black text-zinc-500 uppercase">Watch Time</span>
               </div>
             </div>
           </div>
-          <div className="h-[350px] w-full">
+          <div className="h-[250px] md:h-[350px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={performanceData}>
                 <defs>

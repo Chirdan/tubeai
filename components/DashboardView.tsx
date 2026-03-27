@@ -126,25 +126,25 @@ const DashboardView: React.FC<DashboardViewProps> = ({ profile, publishedVideos,
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         {stats.map((stat, i) => (
           <motion.div 
             key={i}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.1 }}
-            className="bg-zinc-900/50 border border-zinc-800 p-6 rounded-3xl relative overflow-hidden group"
+            className="bg-zinc-900/50 border border-zinc-800 p-4 md:p-6 rounded-2xl md:rounded-3xl relative overflow-hidden group"
           >
-            <div className="flex justify-between items-start mb-4">
-              <div className={`p-3 rounded-2xl bg-zinc-950 border border-zinc-800 ${stat.color}`}>
-                <stat.icon className="w-5 h-5" />
+            <div className="flex justify-between items-start mb-3 md:mb-4">
+              <div className={`p-2 md:p-3 rounded-xl md:rounded-2xl bg-zinc-950 border border-zinc-800 ${stat.color}`}>
+                <stat.icon className="w-4 h-4 md:w-5 md:h-5" />
               </div>
-              <span className="text-[10px] font-black text-green-500 bg-green-500/10 px-2 py-1 rounded-full">
+              <span className="text-[8px] md:text-[10px] font-black text-green-500 bg-green-500/10 px-2 py-1 rounded-full">
                 {stat.trend}
               </span>
             </div>
-            <p className="text-zinc-500 text-xs font-black uppercase tracking-widest">{stat.label}</p>
-            <p className="text-3xl font-black text-white mt-2 tracking-tight">{stat.value}</p>
+            <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest">{stat.label}</p>
+            <p className="text-xl md:text-3xl font-black text-white mt-1 md:mt-2 tracking-tight">{stat.value}</p>
             <div className="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-zinc-800 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
           </motion.div>
         ))}
@@ -152,20 +152,20 @@ const DashboardView: React.FC<DashboardViewProps> = ({ profile, publishedVideos,
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
-          <div className="bg-zinc-900/50 border border-zinc-800 rounded-3xl p-8">
-            <div className="flex items-center justify-between mb-8">
+          <div className="bg-zinc-900/50 border border-zinc-800 rounded-3xl p-4 md:p-8">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 md:mb-8 gap-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-blue-500/10 rounded-lg">
                   <TrendingUp className="w-4 h-4 text-blue-500" />
                 </div>
-                <h4 className="font-bold text-white">Performance Growth</h4>
+                <h4 className="font-bold text-white text-sm md:text-base">Performance Growth</h4>
               </div>
-              <select className="bg-zinc-950 border border-zinc-800 text-[10px] font-black uppercase tracking-widest rounded-lg px-3 py-1.5 outline-none">
+              <select className="w-full sm:w-auto bg-zinc-950 border border-zinc-800 text-[10px] font-black uppercase tracking-widest rounded-lg px-3 py-1.5 outline-none">
                 <option>Last 7 Days</option>
                 <option>Last 30 Days</option>
               </select>
             </div>
-            <div className="h-[300px] w-full">
+            <div className="h-[200px] md:h-[300px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={chartData}>
                   <defs>
@@ -229,17 +229,27 @@ const DashboardView: React.FC<DashboardViewProps> = ({ profile, publishedVideos,
                     whileHover={{ x: 4 }}
                     className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl flex gap-4 hover:border-zinc-700 transition-all cursor-pointer group"
                   >
-                    <div className="w-40 aspect-video bg-zinc-950 rounded-xl overflow-hidden flex-shrink-0 relative">
-                      <img src={video.thumbnailUrl || 'https://picsum.photos/320/180'} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                    <div className="w-24 md:w-40 aspect-video bg-zinc-950 rounded-xl overflow-hidden flex-shrink-0 relative">
+                      {video.thumbnailUrl ? (
+                        <img 
+                          src={video.thumbnailUrl} 
+                          loading="lazy"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-zinc-900 flex items-center justify-center">
+                          <Play className="w-6 h-6 text-zinc-800" />
+                        </div>
+                      )}
                       <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                         <Play className="w-6 h-6 text-white fill-white" />
+                         <Play className="w-4 h-4 md:w-6 md:h-6 text-white fill-white" />
                       </div>
                     </div>
-                    <div className="flex-1 py-1 flex flex-col justify-between overflow-hidden">
+                    <div className="flex-1 py-0.5 md:py-1 flex flex-col justify-between overflow-hidden">
                       <div>
                         <div className="flex items-center justify-between gap-2">
-                          <h4 className="font-bold truncate text-white text-sm">{video.title}</h4>
-                          <div className="flex gap-1 flex-shrink-0">
+                          <h4 className="font-bold truncate text-white text-xs md:text-sm">{video.title}</h4>
+                          <div className="hidden sm:flex gap-1 flex-shrink-0">
                             {video.platforms?.map(p => (
                               <div key={p} className="bg-zinc-800 p-1 rounded-md border border-zinc-700">
                                 {getPlatformIcon(p)}
@@ -247,12 +257,12 @@ const DashboardView: React.FC<DashboardViewProps> = ({ profile, publishedVideos,
                             ))}
                           </div>
                         </div>
-                        <p className="text-xs text-zinc-500 mt-1 line-clamp-1">{video.description}</p>
+                        <p className="text-[10px] md:text-xs text-zinc-500 mt-0.5 md:mt-1 line-clamp-1">{video.description}</p>
                       </div>
-                      <div className="flex items-center gap-4 text-[10px] font-black text-zinc-600 uppercase tracking-widest">
-                        <span>{format(new Date(video.createdAt), 'MMM d, yyyy')}</span>
+                      <div className="flex items-center gap-3 md:gap-4 text-[9px] md:text-[10px] font-black text-zinc-600 uppercase tracking-widest">
+                        <span>{format(new Date(video.createdAt), 'MMM d')}</span>
                         <span className="text-green-500 flex items-center gap-1.5">
-                          <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                          <div className="w-1 h-1 md:w-1.5 md:h-1.5 rounded-full bg-green-500 animate-pulse" />
                           Live
                         </span>
                       </div>

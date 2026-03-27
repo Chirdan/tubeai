@@ -7,18 +7,21 @@ import {
   generateStoryboard, 
   generateClonedVideoVeo, 
   animateImageVeo,
+  extendVideoVeo,
   generateVoiceCloneTTS,
   generatePlatformCaptions, 
   thinkComplexQuery, 
   analyzeVideo,
   generateTopicSuggestions,
   searchFreeAssets,
-  getAvailableModels
+  getAvailableModels,
+  getGeminiKey
 } from '../services/geminiService';
+import { GoogleGenAI, VideoGenerationReferenceType, VideoGenerationReferenceImage } from "@google/genai";
 import { 
   FileText, Image as ImageIcon, Layout, Send, Loader2, Wand2, Play, Sparkles, 
   Youtube, Twitter, Instagram, Smartphone, BrainCircuit, Search, Upload, Video, Save, ExternalLink, Mic, User,
-  Music, Layers, Globe, Cpu, Info
+  Music, Layers, Globe, Cpu, Info, Plus, Facebook
 } from 'lucide-react';
 
 interface StudioViewProps {
@@ -48,9 +51,12 @@ const StudioView: React.FC<StudioViewProps> = ({ profile, onPost, onSaveDraft, i
   const [isAdvanced, setIsAdvanced] = useState(false);
   const [veoPrompt, setVeoPrompt] = useState('');
   const [animationImage, setAnimationImage] = useState<string | null>(null);
+  const [animationVideo, setAnimationVideo] = useState<{ uri: string, blobUrl: string } | null>(null);
+  const [lastOperationVideo, setLastOperationVideo] = useState<{ uri: string, blobUrl: string } | null>(null);
   
   const videoInputRef = useRef<HTMLInputElement>(null);
   const animationInputRef = useRef<HTMLInputElement>(null);
+  const animationVideoInputRef = useRef<HTMLInputElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
 
   const voicePersonalities = [
@@ -70,7 +76,8 @@ const StudioView: React.FC<StudioViewProps> = ({ profile, onPost, onSaveDraft, i
 
   const platforms = [
     { id: 'youtube', icon: Youtube, color: 'text-red-500', bg: 'hover:bg-red-500/10' },
-    { id: 'tiktok', icon: Smartphone, color: 'text-cyan-400', bg: 'hover:bg-cyan-500/10' },
+    { id: 'tiktok', icon: Music, color: 'text-cyan-400', bg: 'hover:bg-cyan-500/10' },
+    { id: 'facebook', icon: Facebook, color: 'text-blue-600', bg: 'hover:bg-blue-600/10' },
     { id: 'instagram', icon: Instagram, color: 'text-pink-500', bg: 'hover:bg-pink-500/10' },
     { id: 'twitter', icon: Twitter, color: 'text-sky-400', bg: 'hover:bg-sky-500/10' },
   ];
@@ -296,18 +303,98 @@ const StudioView: React.FC<StudioViewProps> = ({ profile, onPost, onSaveDraft, i
   };
 
   const handleGenerateVeo = async () => {
-    if (!content.title || !content.storyboard) {
-      alert("Generate a storyboard first.");
+    if (!content.title && !analysisResult) {
+      alert("Generate a script or upload a reference video first.");
       return;
     }
     await ensureApiKey();
     setLoading('video');
     try {
-      const prompt = veoPrompt || `A cinematic video featuring the creator. Topic: ${content.title}. Style: ${activeProfile.brandingStyle}. Scene details: ${content.storyboard.substring(0, 500)}`;
-      const url = await generateClonedVideoVeo(prompt, activeProfile.clonedLikeness || [], aspectRatio);
-      setContent(prev => ({ ...prev, videoUrl: url }));
+      const prompt = veoPrompt || (analysisResult 
+        ? `A cinematic animation inspired by this reference: ${analysisResult}`
+        : `A cinematic video featuring the creator. Topic: ${content.title}. Style: ${activeProfile.brandingStyle}. Scene details: ${content.storyboard?.substring(0, 500)}`);
+      
+      const apiKey = getGeminiKey();
+      const ai = new GoogleGenAI({ apiKey });
+      
+      const referenceImagesPayload: VideoGenerationReferenceImage[] = (activeProfile.clonedLikeness || []).map(img => ({
+        image: {
+          imageBytes: img.split(',')[1],
+          mimeType: 'image/png',
+        },
+        referenceType: VideoGenerationReferenceType.ASSET,
+      }));
+
+      const useLikeness = referenceImagesPayload.length > 0;
+      const model = useLikeness ? 'veo-3.1-generate-preview' : 'veo-3.1-fast-generate-preview';
+
+      let operation = await ai.models.generateVideos({
+        model: model,
+        prompt: prompt,
+        config: {
+          numberOfVideos: 1,
+          resolution: '720p',
+          aspectRatio: aspectRatio,
+          ...(useLikeness ? { referenceImages: referenceImagesPayload } : {})
+        }
+      });
+
+      while (!operation.done) {
+        await new Promise(resolve => setTimeout(resolve, 10000));
+        operation = await ai.operations.getVideosOperation({ operation: operation });
+      }
+
+      const videoData = operation.response?.generatedVideos?.[0]?.video;
+      const downloadLink = videoData?.uri;
+      const response = await fetch(`${downloadLink}&key=${apiKey}`);
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      
+      setLastOperationVideo({ uri: videoData?.uri || '', blobUrl });
+      setContent(prev => ({ ...prev, videoUrl: blobUrl }));
     } catch (error) {
       alert("Veo generation failed.");
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const handleExtendVideo = async () => {
+    if (!lastOperationVideo?.uri) return;
+    
+    await ensureApiKey();
+    setLoading('video');
+    setMotionStatus("Extending Cinematic Sequence...");
+    try {
+      const prompt = veoPrompt || "Continue the scene with more dynamic action and cinematic flair.";
+      const result = await extendVideoVeo(lastOperationVideo.uri, prompt, aspectRatio);
+      
+      setLastOperationVideo(result);
+      setContent(prev => ({ ...prev, videoUrl: result.blobUrl }));
+    } catch (error) {
+      alert("Video extension failed.");
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    setLoading('video');
+    setMotionStatus("Analyzing Reference Video...");
+    try {
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64 = (reader.result as string).split(',')[1];
+        const result = await analyzeVideo(base64, file.type, "Describe the visual style, motion, and key elements of this video to use as a reference for animation.");
+        setAnalysisResult(result);
+        setVeoPrompt(prev => prev ? `${prev}\n\nReference Style: ${result}` : `Reference Style: ${result}`);
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+      alert("Video analysis failed.");
     } finally {
       setLoading(null);
     }
@@ -332,8 +419,9 @@ const StudioView: React.FC<StudioViewProps> = ({ profile, onPost, onSaveDraft, i
     setMotionStatus("Synthesizing Motion...");
     try {
       const prompt = veoPrompt || `Animate this scene beautifully, cinematic motion, 4k. Title: ${content.title || 'Untitled'}`;
-      const url = await animateImageVeo(animationImage, prompt, aspectRatio);
-      setContent(prev => ({ ...prev, videoUrl: url }));
+      const result = await animateImageVeo(animationImage, prompt, aspectRatio);
+      setLastOperationVideo(result);
+      setContent(prev => ({ ...prev, videoUrl: result.blobUrl }));
     } catch (error) {
       alert("Image animation failed.");
     } finally {
@@ -384,26 +472,26 @@ const StudioView: React.FC<StudioViewProps> = ({ profile, onPost, onSaveDraft, i
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 pb-32 animate-in fade-in duration-700">
-      <div className="flex justify-end mb-4">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6 md:space-y-8 pb-32 animate-in fade-in duration-700">
+      <div className="flex justify-end mb-2 md:mb-4">
         <button 
           onClick={() => setIsAdvanced(!isAdvanced)}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-white transition-all"
+          className="flex items-center gap-2 px-3 py-2 md:px-4 md:py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-[9px] md:text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-white transition-all"
         >
           {isAdvanced ? <Layout className="w-3 h-3" /> : <Sparkles className="w-3 h-3" />}
-          {isAdvanced ? 'Switch to Simple Mode' : 'Switch to Advanced Mode'}
+          {isAdvanced ? 'Simple Mode' : 'Advanced Mode'}
         </button>
       </div>
 
-      <div className={`grid grid-cols-1 ${isAdvanced ? 'xl:grid-cols-4' : 'max-w-4xl mx-auto'} gap-8 transition-all duration-500`}>
+      <div className={`grid grid-cols-1 ${isAdvanced ? 'xl:grid-cols-4' : 'max-w-4xl mx-auto'} gap-4 md:gap-8 transition-all duration-500`} style={{ contentVisibility: 'auto' }}>
         
         {/* AI Lab Sidebar - Only in Advanced Mode */}
         {isAdvanced && (
-          <div className="xl:col-span-1 space-y-6 animate-in slide-in-from-left-4">
-            <div className="bg-zinc-900/80 border border-zinc-800 p-6 rounded-3xl backdrop-blur-md">
-            <div className="flex items-center gap-2 text-indigo-400 mb-6">
+          <div className="xl:col-span-1 space-y-4 md:space-y-6 animate-in slide-in-from-left-4">
+            <div className="bg-zinc-900/80 border border-zinc-800 p-4 md:p-6 rounded-3xl backdrop-blur-md">
+            <div className="flex items-center gap-2 text-indigo-400 mb-4 md:mb-6">
               <BrainCircuit className="w-5 h-5" />
-              <h3 className="font-bold uppercase tracking-wider text-sm">Clone Lab</h3>
+              <h3 className="font-bold uppercase tracking-wider text-xs md:text-sm">Clone Lab</h3>
             </div>
             
             <div className="space-y-6">
@@ -466,7 +554,7 @@ const StudioView: React.FC<StudioViewProps> = ({ profile, onPost, onSaveDraft, i
                 <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block">Neural Likeness</label>
                 <div className="flex -space-x-3 overflow-hidden p-1">
                    {activeProfile.clonedLikeness?.map((img, i) => (
-                     <img key={i} src={img} className="w-10 h-10 rounded-full border-2 border-zinc-900 object-cover" />
+                     <img key={i} src={img} loading="lazy" className="w-10 h-10 rounded-full border-2 border-zinc-900 object-cover" />
                    ))}
                    {(!activeProfile.clonedLikeness || activeProfile.clonedLikeness.length === 0) && (
                      <div className="w-10 h-10 rounded-full border-2 border-zinc-900 bg-zinc-800 flex items-center justify-center text-zinc-600">
@@ -535,13 +623,13 @@ const StudioView: React.FC<StudioViewProps> = ({ profile, onPost, onSaveDraft, i
       )}
 
         {/* Main Production Area */}
-        <div className={`${isAdvanced ? 'xl:col-span-3' : 'w-full'} space-y-8`}>
-          <div className={`bg-zinc-900/50 ${isAdvanced ? 'p-8' : 'p-12'} rounded-3xl border border-zinc-800 backdrop-blur-sm shadow-2xl`}>
-            <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-8">
-              <div className={!isAdvanced ? 'text-center w-full mb-4' : ''}>
-                <div className={`flex items-center gap-3 mb-1 ${!isAdvanced ? 'justify-center' : ''}`}>
-                  <h2 className={`${isAdvanced ? 'text-3xl' : 'text-5xl'} font-black tracking-tight text-white flex items-center gap-3`}>
-                    Production Studio <div className="bg-indigo-600 px-2 py-0.5 rounded text-[10px] uppercase">Neural Clone</div>
+        <div className={`${isAdvanced ? 'xl:col-span-3' : 'w-full'} space-y-6 md:space-y-8`} style={{ contentVisibility: 'auto' }}>
+          <div className={`bg-zinc-900/50 ${isAdvanced ? 'p-4 md:p-8' : 'p-5 md:p-12'} rounded-3xl border border-zinc-800 backdrop-blur-sm shadow-2xl`}>
+            <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-4 md:mb-8">
+              <div className={!isAdvanced ? 'text-center w-full mb-2 md:mb-4' : ''}>
+                <div className={`flex flex-wrap items-center gap-2 md:gap-3 mb-1 ${!isAdvanced ? 'justify-center' : ''}`}>
+                  <h2 className={`${isAdvanced ? 'text-lg md:text-3xl' : 'text-2xl md:text-5xl'} font-black tracking-tight text-white flex items-center gap-2 md:gap-3`}>
+                    Production Studio <div className="bg-indigo-600 px-2 py-0.5 rounded text-[7px] md:text-[10px] uppercase">Neural Clone</div>
                   </h2>
                   {isAdvanced && (
                     <div className="relative">
@@ -618,14 +706,14 @@ const StudioView: React.FC<StudioViewProps> = ({ profile, onPost, onSaveDraft, i
               )}
             </div>
 
-            <div className={`flex flex-col ${isAdvanced ? 'md:flex-row' : 'gap-6'} gap-4 mb-4`}>
+            <div className={`flex flex-col ${isAdvanced ? 'md:flex-row' : 'gap-4 md:gap-6'} gap-3 md:gap-4 mb-4`}>
               <div className="flex-1 relative">
                 <input
                   type="text"
                   value={topic}
                   onChange={(e) => setTopic(e.target.value)}
                   placeholder="What should your video be about?"
-                  className={`w-full bg-zinc-950 border border-zinc-800 rounded-2xl ${isAdvanced ? 'px-5 py-4' : 'px-8 py-6 text-xl'} focus:outline-none focus:ring-2 focus:ring-red-500/50 transition-all text-white shadow-inner`}
+                  className={`w-full bg-zinc-950 border border-zinc-800 rounded-2xl ${isAdvanced ? 'px-4 md:px-5 py-3 md:py-4' : 'px-6 md:px-8 py-4 md:py-6 text-base md:text-xl'} focus:outline-none focus:ring-2 focus:ring-red-500/50 transition-all text-white shadow-inner`}
                 />
                 <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
                   {isAdvanced && (
@@ -635,34 +723,34 @@ const StudioView: React.FC<StudioViewProps> = ({ profile, onPost, onSaveDraft, i
                       className="p-1.5 rounded-lg bg-zinc-900 text-zinc-500 hover:text-indigo-400 transition-colors"
                       title="Suggest trending topics"
                     >
-                      {loading === 'suggest' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                      {loading === 'suggest' ? <Loader2 className="w-3 h-3 md:w-4 md:h-4 animate-spin" /> : <Sparkles className="w-3 h-3 md:w-4 md:h-4" />}
                     </button>
                   )}
-                  <Search className={`${isAdvanced ? 'w-5 h-5' : 'w-6 h-6'} text-zinc-800`} />
+                  <Search className={`${isAdvanced ? 'w-4 h-4 md:w-5 md:h-5' : 'w-5 h-5 md:w-6 md:h-6'} text-zinc-800`} />
                 </div>
               </div>
-              <div className={`flex ${isAdvanced ? 'gap-2' : 'justify-center gap-4'}`}>
+              <div className={`flex flex-col sm:flex-row ${isAdvanced ? 'gap-2' : 'justify-center gap-3 md:gap-4'}`}>
                 {isAdvanced && (
                   <button
                     onClick={handleCreateIdea}
                     disabled={!!loading || !topic}
-                    className="bg-zinc-800 text-white font-black px-6 py-4 rounded-2xl hover:bg-zinc-700 transition-all flex items-center gap-2 disabled:opacity-50 active:scale-95"
+                    className="bg-zinc-800 text-white font-black px-6 py-3 md:py-4 rounded-2xl hover:bg-zinc-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95 text-xs md:text-sm"
                   >
-                    {loading === 'content' ? <Loader2 className="animate-spin w-5 h-5" /> : <Wand2 className="w-5 h-5" />}
+                    {loading === 'content' ? <Loader2 className="animate-spin w-4 h-4 md:w-5 md:h-5" /> : <Wand2 className="w-4 h-4 md:w-5 md:h-5" />}
                     Draft
                   </button>
                 )}
                 <button
                   onClick={handleMagicCreate}
                   disabled={!!loading || !topic}
-                  className={`${isAdvanced ? 'px-8 py-4' : 'px-12 py-6 text-xl w-full md:w-auto'} bg-red-600 text-white font-black rounded-2xl hover:bg-red-700 transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl shadow-red-600/20 active:scale-95 group relative overflow-hidden`}
+                  className={`${isAdvanced ? 'px-6 md:px-8 py-3 md:py-4' : 'px-8 md:px-12 py-4 md:py-6 text-base md:text-xl w-full md:w-auto'} bg-red-600 text-white font-black rounded-2xl hover:bg-red-700 transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl shadow-red-600/20 active:scale-95 group relative overflow-hidden`}
                 >
                   {loading === 'magic' ? (
-                    <Loader2 className="animate-spin w-6 h-6" />
+                    <Loader2 className="animate-spin w-5 h-5 md:w-6 md:h-6" />
                   ) : (
-                    <Sparkles className="w-6 h-6 group-hover:animate-pulse" />
+                    <Sparkles className="w-5 h-5 md:w-6 md:h-6 group-hover:animate-pulse" />
                   )}
-                  <span>{loading === 'magic' ? 'Creating Magic...' : 'Magic Create'}</span>
+                  <span>{loading === 'magic' ? 'Creating...' : 'Magic Create'}</span>
                   {loading === 'magic' && (
                     <div 
                       className="absolute bottom-0 left-0 h-1 bg-white/30 transition-all duration-500" 
@@ -673,9 +761,9 @@ const StudioView: React.FC<StudioViewProps> = ({ profile, onPost, onSaveDraft, i
                 <button
                   onClick={handleFindResources}
                   disabled={!!loading || !topic}
-                  className={`${isAdvanced ? 'px-6 py-4' : 'px-12 py-6 text-xl w-full md:w-auto'} bg-zinc-950 border border-zinc-800 text-zinc-400 font-black rounded-2xl hover:border-indigo-500 hover:text-white transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95`}
+                  className={`${isAdvanced ? 'px-6 py-3 md:py-4' : 'px-8 md:px-12 py-4 md:py-6 text-base md:text-xl w-full md:w-auto'} bg-zinc-950 border border-zinc-800 text-zinc-400 font-black rounded-2xl hover:border-indigo-500 hover:text-white transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95 text-xs md:text-sm`}
                 >
-                  {loading === 'resources' ? <Loader2 className="animate-spin w-5 h-5" /> : <Globe className="w-5 h-5" />}
+                  {loading === 'resources' ? <Loader2 className="animate-spin w-4 h-4 md:w-5 md:h-5" /> : <Globe className="w-4 h-4 md:w-5 md:h-5" />}
                   Find Resources
                 </button>
               </div>
@@ -818,6 +906,7 @@ const StudioView: React.FC<StudioViewProps> = ({ profile, onPost, onSaveDraft, i
                           <img 
                             src={content.thumbnailUrl} 
                             alt="Thumbnail" 
+                            loading="lazy"
                             className="w-full h-full object-cover transition-transform group-hover:scale-105 duration-700"
                             referrerPolicy="no-referrer"
                           />
@@ -866,6 +955,13 @@ const StudioView: React.FC<StudioViewProps> = ({ profile, onPost, onSaveDraft, i
                             accept="image/*" 
                             className="hidden" 
                           />
+                          <input 
+                            type="file" 
+                            ref={videoInputRef} 
+                            onChange={handleVideoUpload} 
+                            accept="video/*" 
+                            className="hidden" 
+                          />
                           <button 
                             onClick={() => setAspectRatio('16:9')} 
                             className={`px-3 py-1 rounded-lg text-[10px] font-black transition-all ${aspectRatio === '16:9' ? 'bg-orange-600 text-white shadow-lg' : 'text-zinc-500 hover:text-zinc-300'}`}
@@ -882,7 +978,7 @@ const StudioView: React.FC<StudioViewProps> = ({ profile, onPost, onSaveDraft, i
                      </div>
 
                      <div className="space-y-4 mb-6">
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-3 gap-3">
                           <button 
                             onClick={() => animationInputRef.current?.click()}
                             className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl bg-zinc-900 border border-zinc-800 hover:border-orange-500/50 transition-all group"
@@ -890,13 +986,23 @@ const StudioView: React.FC<StudioViewProps> = ({ profile, onPost, onSaveDraft, i
                             <div className="p-2 rounded-xl bg-zinc-950 text-zinc-500 group-hover:text-orange-500 transition-colors">
                               <Upload className="w-5 h-5" />
                             </div>
-                            <span className="text-[10px] font-black uppercase text-zinc-500 group-hover:text-zinc-300">Upload Base Image</span>
+                            <span className="text-[8px] font-black uppercase text-zinc-500 group-hover:text-zinc-300">Base Image</span>
+                          </button>
+
+                          <button 
+                            onClick={() => videoInputRef.current?.click()}
+                            className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl bg-zinc-900 border border-zinc-800 hover:border-orange-500/50 transition-all group"
+                          >
+                            <div className="p-2 rounded-xl bg-zinc-950 text-zinc-500 group-hover:text-orange-500 transition-colors">
+                              <Video className="w-5 h-5" />
+                            </div>
+                            <span className="text-[8px] font-black uppercase text-zinc-500 group-hover:text-zinc-300">Reference Video</span>
                           </button>
                           
                           <div className="relative rounded-2xl bg-zinc-900 border border-zinc-800 overflow-hidden flex items-center justify-center">
                             {animationImage ? (
                               <>
-                                <img src={animationImage} className="w-full h-full object-cover opacity-50" />
+                                <img src={animationImage} loading="lazy" className="w-full h-full object-cover opacity-50" />
                                 <button 
                                   onClick={() => setAnimationImage(null)}
                                   className="absolute top-2 right-2 p-1 bg-black/50 rounded-lg text-white hover:bg-red-500 transition-colors"
@@ -904,13 +1010,18 @@ const StudioView: React.FC<StudioViewProps> = ({ profile, onPost, onSaveDraft, i
                                   <Save className="w-3 h-3 rotate-45" />
                                 </button>
                                 <div className="absolute inset-0 flex items-center justify-center">
-                                  <span className="text-[8px] font-black uppercase bg-orange-600 px-2 py-0.5 rounded text-white">Ready to Animate</span>
+                                  <span className="text-[8px] font-black uppercase bg-orange-600 px-2 py-0.5 rounded text-white">Ready</span>
                                 </div>
                               </>
+                            ) : analysisResult ? (
+                              <div className="text-center p-4">
+                                <BrainCircuit className="w-5 h-5 text-indigo-500 mx-auto mb-1" />
+                                <p className="text-[8px] font-black text-indigo-400 uppercase">Video Analyzed</p>
+                              </div>
                             ) : (
                               <div className="text-center p-4">
                                 <ImageIcon className="w-5 h-5 text-zinc-800 mx-auto mb-1" />
-                                <p className="text-[8px] font-black text-zinc-700 uppercase">No Image Selected</p>
+                                <p className="text-[8px] font-black text-zinc-700 uppercase">No Ref</p>
                               </div>
                             )}
                           </div>
@@ -956,15 +1067,25 @@ const StudioView: React.FC<StudioViewProps> = ({ profile, onPost, onSaveDraft, i
                           </div>
                         )}
 
-                        <div className="absolute inset-x-4 bottom-4 translate-y-full group-hover:translate-y-0 transition-all duration-300 z-10">
-                           <button 
-                             onClick={animationImage ? handleAnimateImage : handleGenerateVeo}
-                             disabled={!!loading || (!content.storyboard && !animationImage)}
-                             className="w-full bg-orange-600 text-white py-4 rounded-xl text-xs font-black uppercase tracking-widest shadow-2xl shadow-orange-600/30 hover:bg-orange-500 active:scale-95 transition-all flex items-center justify-center gap-2"
-                           >
-                             {animationImage ? <Sparkles className="w-4 h-4" /> : <Video className="w-4 h-4" />}
-                             {animationImage ? 'Animate Selected Image' : 'Synthesize from Storyboard'}
-                           </button>
+                        <div className="absolute inset-x-4 bottom-4 translate-y-full group-hover:translate-y-0 transition-all duration-300 z-10 flex gap-2">
+                      <button 
+                        onClick={animationImage ? handleAnimateImage : handleGenerateVeo}
+                        disabled={!!loading || (!content.storyboard && !animationImage && !analysisResult)}
+                        className="flex-1 bg-orange-600 text-white py-4 rounded-xl text-xs font-black uppercase tracking-widest shadow-2xl shadow-orange-600/30 hover:bg-orange-500 active:scale-95 transition-all flex items-center justify-center gap-2"
+                      >
+                        {animationImage ? <Sparkles className="w-4 h-4" /> : analysisResult ? <Wand2 className="w-4 h-4" /> : <Video className="w-4 h-4" />}
+                        {animationImage ? 'Animate Image' : analysisResult ? 'Video to Animation' : 'Synthesize'}
+                      </button>
+                           {lastOperationVideo && (
+                             <button 
+                               onClick={handleExtendVideo}
+                               disabled={!!loading}
+                               className="bg-zinc-900 border border-zinc-800 text-white px-4 py-4 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-zinc-800 transition-all flex items-center justify-center gap-2"
+                               title="Extend video by 7 seconds"
+                             >
+                               <Plus className="w-4 h-4" />
+                             </button>
+                           )}
                         </div>
                      </div>
                   </div>

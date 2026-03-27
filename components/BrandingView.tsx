@@ -73,27 +73,27 @@ const BrandingView: React.FC<BrandingViewProps> = ({ profile, onUpdate }) => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
         {/* Basic Brand Info */}
-        <div className="lg:col-span-2 space-y-8">
-          <div className="bg-zinc-900/50 p-8 rounded-3xl border border-zinc-800 backdrop-blur-sm">
-            <h2 className="text-2xl font-bold mb-2 text-white flex items-center gap-2">
-              <Palette className="w-6 h-6 text-red-500" /> Channel Architect
+        <div className="lg:col-span-2 space-y-6 md:space-y-8">
+          <div className="bg-zinc-900/50 p-6 md:p-8 rounded-3xl border border-zinc-800 backdrop-blur-sm">
+            <h2 className="text-xl md:text-2xl font-bold mb-2 text-white flex items-center gap-2">
+              <Palette className="w-5 h-5 md:w-6 md:h-6 text-red-500" /> Channel Architect
             </h2>
-            <p className="text-zinc-400 mb-6">Define your niche and let AI build your brand identity.</p>
+            <p className="text-xs md:text-sm text-zinc-400 mb-6">Define your niche and let AI build your brand identity.</p>
             
-            <div className="flex flex-col md:flex-row gap-4 mb-10">
+            <div className="flex flex-col sm:flex-row gap-3 md:gap-4 mb-8 md:mb-10">
               <input
                 type="text"
                 value={niche}
                 onChange={(e) => setNiche(e.target.value)}
-                placeholder="e.g., Quantum Physics Explained, Street Food Tours"
-                className="flex-1 bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-4 focus:outline-none focus:ring-2 focus:ring-red-500 transition-all placeholder:text-zinc-700"
+                placeholder="e.g., Quantum Physics Explained"
+                className="flex-1 bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 md:py-4 focus:outline-none focus:ring-2 focus:ring-red-500 transition-all placeholder:text-zinc-700 text-sm md:text-base"
               />
               <button
                 onClick={handleGenerate}
                 disabled={loading || !niche}
-                className="bg-white text-black font-bold px-8 py-4 rounded-xl hover:bg-zinc-200 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                className="bg-white text-black font-bold px-6 md:px-8 py-3 md:py-4 rounded-xl hover:bg-zinc-200 transition-all flex items-center justify-center gap-2 disabled:opacity-50 text-sm md:text-base"
               >
-                {loading ? <RefreshCw className="animate-spin w-5 h-5" /> : <Sparkles className="w-5 h-5" />}
+                {loading ? <RefreshCw className="animate-spin w-4 h-4 md:w-5 md:h-5" /> : <Sparkles className="w-4 h-4 md:w-5 md:h-5" />}
                 Architect
               </button>
             </div>
@@ -133,12 +133,12 @@ const BrandingView: React.FC<BrandingViewProps> = ({ profile, onUpdate }) => {
         </div>
 
         {/* Cloning Chamber */}
-        <div className="lg:col-span-1 space-y-8">
-          <div className="bg-zinc-900/80 border border-zinc-800 p-8 rounded-3xl backdrop-blur-md relative overflow-hidden group">
+        <div className="lg:col-span-1 space-y-6 md:space-y-8">
+          <div className="bg-zinc-900/80 border border-zinc-800 p-6 md:p-8 rounded-3xl backdrop-blur-md relative overflow-hidden group">
             <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/5 to-purple-600/5 pointer-events-none" />
             
-            <h2 className="text-xl font-black mb-6 text-white flex items-center gap-2">
-              <User className="w-5 h-5 text-indigo-500" /> Cloning Chamber
+            <h2 className="text-lg md:text-xl font-black mb-6 text-white flex items-center gap-2">
+              <User className="w-4 h-4 md:w-5 md:h-5 text-indigo-500" /> Cloning Chamber
             </h2>
 
             <div className="space-y-8">
@@ -148,7 +148,7 @@ const BrandingView: React.FC<BrandingViewProps> = ({ profile, onUpdate }) => {
                 <div className="flex gap-3">
                   {localProfile?.clonedLikeness?.map((img, i) => (
                     <div key={i} className="w-20 h-20 rounded-xl overflow-hidden border border-zinc-700 relative group/img">
-                      <img src={img} className="w-full h-full object-cover" />
+                      <img src={img} loading="lazy" className="w-full h-full object-cover" />
                       <button 
                         onClick={() => handleInputChange('clonedLikeness', localProfile.clonedLikeness?.filter((_, idx) => idx !== i))}
                         className="absolute inset-0 bg-red-600/80 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity"
