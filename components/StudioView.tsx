@@ -46,8 +46,9 @@ const StudioView: React.FC<StudioViewProps> = ({ profile, onPost, onSaveDraft, i
   const [magicProgress, setMagicProgress] = useState(0);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [freeAssets, setFreeAssets] = useState<FreeAsset[]>([]);
-  const [selectedModel, setSelectedModel] = useState<AIModel>('gemini-3.1-flash-preview');
+  const [selectedModel, setSelectedModel] = useState<AIModel>(profile?.preferredModel || 'gemini-3.1-flash-preview');
   const [showModelInfo, setShowModelInfo] = useState(false);
+  const [showComparisonModal, setShowComparisonModal] = useState(false);
   const [isAdvanced, setIsAdvanced] = useState(false);
   const [veoPrompt, setVeoPrompt] = useState('');
   const [animationImage, setAnimationImage] = useState<string | null>(null);
@@ -473,6 +474,129 @@ const StudioView: React.FC<StudioViewProps> = ({ profile, onPost, onSaveDraft, i
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6 md:space-y-8 pb-32 animate-in fade-in duration-700">
+      {/* Model Comparison Modal */}
+      {showComparisonModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4 md:p-8 animate-in fade-in duration-300">
+          <div className="bg-zinc-950 border border-zinc-800 rounded-3xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+            <div className="p-6 border-b border-zinc-800 flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-black text-white uppercase tracking-tighter flex items-center gap-3">
+                  <Cpu className="w-6 h-6 text-indigo-500" />
+                  AI Engine Comparison Matrix
+                </h3>
+                <p className="text-xs text-zinc-500 mt-1 uppercase tracking-widest font-bold">Select the optimal neural engine for your production workflow</p>
+              </div>
+              <button 
+                onClick={() => setShowComparisonModal(false)}
+                className="p-2 hover:bg-zinc-900 rounded-full text-zinc-500 transition-colors"
+              >
+                <Plus className="w-6 h-6 rotate-45" />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-auto p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {getAvailableModels().map(model => (
+                  <div 
+                    key={model.id}
+                    className={`p-6 rounded-3xl border transition-all flex flex-col ${
+                      selectedModel === model.id 
+                        ? 'bg-indigo-500/5 border-indigo-500/50 ring-1 ring-indigo-500/20' 
+                        : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-700'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between mb-4">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <h4 className="text-lg font-black text-white">{model.name}</h4>
+                          {model.id === 'gemini-3.1-pro-preview' && (
+                            <span className="bg-amber-500/20 text-amber-500 text-[7px] font-black uppercase px-1.5 py-0.5 rounded-md border border-amber-500/30">Recommended</span>
+                          )}
+                          {model.id === 'gemini-3.1-flash-preview' && (
+                            <span className="bg-emerald-500/20 text-emerald-500 text-[7px] font-black uppercase px-1.5 py-0.5 rounded-md border border-emerald-500/30">Fastest</span>
+                          )}
+                        </div>
+                        <span className={`text-[9px] px-2 py-0.5 rounded-full uppercase font-black tracking-widest ${
+                          model.isLegacy ? 'bg-zinc-800 text-zinc-500' : 'bg-indigo-500 text-white'
+                        }`}>
+                          {model.type}
+                        </span>
+                      </div>
+                      {selectedModel === model.id && (
+                        <div className="bg-indigo-500 p-1 rounded-full">
+                          <Sparkles className="w-3 h-3 text-white" />
+                        </div>
+                      )}
+                    </div>
+                    
+                    <p className="text-xs text-zinc-400 leading-relaxed mb-6 flex-1">
+                      {model.description}
+                    </p>
+                    
+                    <div className="space-y-4 mb-8">
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-[9px] font-black uppercase tracking-widest text-zinc-500">
+                          <span>Intelligence</span>
+                          <span className="text-white">{model.stats.intelligence}/10</span>
+                        </div>
+                        <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                          <div className="h-full bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]" style={{ width: `${model.stats.intelligence * 10}%` }} />
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-[9px] font-black uppercase tracking-widest text-zinc-500">
+                          <span>Speed</span>
+                          <span className="text-white">{model.stats.speed}/10</span>
+                        </div>
+                        <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                          <div className="h-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]" style={{ width: `${model.stats.speed * 10}%` }} />
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center justify-between text-[9px] font-black uppercase tracking-widest text-zinc-500">
+                        <span>Cost Efficiency</span>
+                        <span className="text-white">{model.stats.cost}</span>
+                      </div>
+                    </div>
+                    
+                    <button
+                      onClick={() => {
+                        setSelectedModel(model.id as AIModel);
+                        setShowComparisonModal(false);
+                      }}
+                      className={`w-full py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                        selectedModel === model.id
+                          ? 'bg-zinc-800 text-zinc-500 cursor-default'
+                          : 'bg-white text-black hover:bg-zinc-200'
+                      }`}
+                    >
+                      {selectedModel === model.id ? 'Currently Active' : 'Select Engine'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            <div className="p-6 bg-zinc-900/50 border-t border-zinc-800 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-indigo-500" />
+                  <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">High Intelligence</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                  <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">High Speed</span>
+                </div>
+              </div>
+              <p className="text-[10px] text-zinc-600 font-medium italic">
+                * Performance metrics are estimated based on neural benchmarks
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex justify-end mb-2 md:mb-4">
         <button 
           onClick={() => setIsAdvanced(!isAdvanced)}
@@ -631,58 +755,87 @@ const StudioView: React.FC<StudioViewProps> = ({ profile, onPost, onSaveDraft, i
                   <h2 className={`${isAdvanced ? 'text-lg md:text-3xl' : 'text-2xl md:text-5xl'} font-black tracking-tight text-white flex items-center gap-2 md:gap-3`}>
                     Production Studio <div className="bg-indigo-600 px-2 py-0.5 rounded text-[7px] md:text-[10px] uppercase">Neural Clone</div>
                   </h2>
-                  {isAdvanced && (
-                    <div className="relative">
-                      <button 
-                        onClick={() => setShowModelInfo(!showModelInfo)}
-                        className="flex items-center gap-2 bg-zinc-950 border border-zinc-800 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-white transition-all"
-                      >
-                        <Cpu className="w-3 h-3 text-indigo-500" />
-                        {getAvailableModels().find(m => m.id === selectedModel)?.name}
-                        <Info className="w-3 h-3 ml-1" />
-                      </button>
-                      
-                      {showModelInfo && (
-                        <div className="absolute left-0 top-full mt-2 w-72 bg-zinc-950 border border-zinc-800 rounded-2xl p-4 shadow-2xl z-50 animate-in fade-in zoom-in-95">
-                          <h4 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-3">AI Engine Selection</h4>
-                          <div className="space-y-3">
-                            {getAvailableModels().map(model => (
-                              <button
-                                key={model.id}
-                                onClick={() => {
-                                  setSelectedModel(model.id as AIModel);
-                                  setShowModelInfo(false);
-                                }}
-                                className={`w-full text-left p-3 rounded-xl border transition-all ${
-                                  selectedModel === model.id 
-                                    ? 'bg-indigo-500/10 border-indigo-500/50' 
-                                    : 'bg-zinc-900 border-zinc-800 hover:border-zinc-700'
-                                }`}
-                              >
-                                <div className="flex items-center justify-between mb-1">
-                                  <span className="text-xs font-bold text-white">{model.name}</span>
-                                  <span className={`text-[8px] px-1.5 py-0.5 rounded uppercase font-black ${
-                                    model.isLegacy ? 'bg-zinc-800 text-zinc-500' : 'bg-indigo-500 text-white'
-                                  }`}>
-                                    {model.type}
-                                  </span>
-                                </div>
-                                <p className="text-[10px] text-zinc-500 leading-relaxed mb-2">{model.description}</p>
-                                {model.id.includes('hf') || model.id.includes('llama') || model.id.includes('mistral') ? (
-                                  !process.env.HUGGINGFACE_API_KEY && (
-                                    <div className="flex items-center gap-1.5 text-[8px] text-amber-500 font-bold uppercase tracking-wider">
-                                      <Info className="w-2.5 h-2.5" />
-                                      Requires HUGGINGFACE_API_KEY
-                                    </div>
-                                  )
-                                ) : null}
-                              </button>
-                            ))}
-                          </div>
+                  <div className="relative">
+                    <button 
+                      onClick={() => setShowModelInfo(!showModelInfo)}
+                      className="flex items-center gap-2 bg-zinc-950 border border-zinc-800 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-white transition-all"
+                    >
+                      <Cpu className="w-3 h-3 text-indigo-500" />
+                      {getAvailableModels().find(m => m.id === selectedModel)?.name}
+                      <Info className="w-3 h-3 ml-1" />
+                    </button>
+                    
+                    {showModelInfo && (
+                      <div className="absolute left-0 top-full mt-2 w-80 bg-zinc-950 border border-zinc-800 rounded-2xl p-4 shadow-2xl z-50 animate-in fade-in zoom-in-95">
+                        <div className="flex items-center justify-between mb-4">
+                          <h4 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">AI Engine Selection</h4>
+                          <button 
+                            onClick={() => {
+                              setShowComparisonModal(true);
+                              setShowModelInfo(false);
+                            }}
+                            className="text-[8px] font-bold text-indigo-400 uppercase hover:underline"
+                          >
+                            Compare All
+                          </button>
                         </div>
-                      )}
-                    </div>
-                  )}
+                        <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 scrollbar-hide">
+                          {getAvailableModels().map(model => (
+                            <button
+                              key={model.id}
+                              onClick={() => {
+                                setSelectedModel(model.id as AIModel);
+                                setShowModelInfo(false);
+                              }}
+                              className={`w-full text-left p-3 rounded-xl border transition-all ${
+                                selectedModel === model.id 
+                                  ? 'bg-indigo-500/10 border-indigo-500/50' 
+                                  : 'bg-zinc-900 border-zinc-800 hover:border-zinc-700'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-xs font-bold text-white">{model.name}</span>
+                                <span className={`text-[8px] px-1.5 py-0.5 rounded uppercase font-black ${
+                                  model.isLegacy ? 'bg-zinc-800 text-zinc-500' : 'bg-indigo-500 text-white'
+                                }`}>
+                                  {model.type}
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-zinc-500 leading-relaxed mb-3">{model.description}</p>
+                              
+                              <div className="grid grid-cols-3 gap-2 mb-2">
+                                <div className="space-y-1">
+                                  <div className="text-[7px] text-zinc-600 uppercase font-black">Intelligence</div>
+                                  <div className="h-1 bg-zinc-800 rounded-full overflow-hidden">
+                                    <div className="h-full bg-indigo-500" style={{ width: `${model.stats.intelligence * 10}%` }} />
+                                  </div>
+                                </div>
+                                <div className="space-y-1">
+                                  <div className="text-[7px] text-zinc-600 uppercase font-black">Speed</div>
+                                  <div className="h-1 bg-zinc-800 rounded-full overflow-hidden">
+                                    <div className="h-full bg-emerald-500" style={{ width: `${model.stats.speed * 10}%` }} />
+                                  </div>
+                                </div>
+                                <div className="space-y-1">
+                                  <div className="text-[7px] text-zinc-600 uppercase font-black">Cost</div>
+                                  <div className="text-[8px] font-bold text-zinc-400">{model.stats.cost}</div>
+                                </div>
+                              </div>
+
+                              {model.id.includes('hf') || model.id.includes('llama') || model.id.includes('mistral') ? (
+                                !process.env.HUGGINGFACE_API_KEY && (
+                                  <div className="flex items-center gap-1.5 text-[8px] text-amber-500 font-bold uppercase tracking-wider">
+                                    <Info className="w-2.5 h-2.5" />
+                                    Requires HUGGINGFACE_API_KEY
+                                  </div>
+                                )
+                              ) : null}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <p className={`text-zinc-400 ${isAdvanced ? 'text-sm' : 'text-lg font-medium'}`}>
                   {isAdvanced ? 'Automating your presence with Veo 3.1' : 'The easiest way to create viral AI content in one click.'}

@@ -1,7 +1,7 @@
 
 import { GoogleGenAI, Type, Modality, VideoGenerationReferenceType, VideoGenerationReferenceImage } from "@google/genai";
 import { HfInference } from "@huggingface/inference";
-import { ChannelProfile, VideoContent, PlatformCaption, GroundingSource, FreeAsset, AIModel } from "../types";
+import { ChannelProfile, VideoContent, PlatformCaption, GroundingSource, FreeAsset, AIModel, ModelMetadata } from "../types";
 
 // Robust API key retrieval
 const getApiKey = (keyName: string): string => {
@@ -585,49 +585,55 @@ export const searchFreeAssets = async (topic: string): Promise<FreeAsset[]> => {
   }
 };
 
-export const getAvailableModels = () => {
+export const getAvailableModels = (): ModelMetadata[] => {
   return [
     {
       id: 'gemini-3.1-pro-preview',
       name: 'Gemini 3.1 Pro',
       description: 'The most intelligent model for complex reasoning and high-quality content.',
-      type: 'Premium/Smart',
-      isLegacy: false
+      type: 'Premium',
+      isLegacy: false,
+      stats: { intelligence: 10, speed: 6, cost: 'High' }
     },
     {
       id: 'gemini-3.1-flash-preview',
       name: 'Gemini 3.1 Flash',
       description: 'Fast, balanced model for quick generation and real-time trends.',
-      type: 'Fast/Balanced',
-      isLegacy: false
+      type: 'Balanced',
+      isLegacy: false,
+      stats: { intelligence: 8, speed: 9, cost: 'Low' }
     },
     {
       id: 'llama-3-70b',
       name: 'Llama 3 70B (HF)',
       description: 'Meta\'s powerful open-source model via Hugging Face Inference.',
-      type: 'Open Source/Powerful',
-      isLegacy: false
+      type: 'Open Source',
+      isLegacy: false,
+      stats: { intelligence: 9, speed: 7, cost: 'Medium' }
     },
     {
       id: 'mistral-large',
       name: 'Mistral Large (HF)',
       description: 'Mistral AI\'s flagship model, excellent for reasoning and multilingual tasks.',
-      type: 'Open Source/Smart',
-      isLegacy: false
+      type: 'Open Source',
+      isLegacy: false,
+      stats: { intelligence: 9, speed: 7, cost: 'Medium' }
     },
     {
       id: 'gemini-3.1-flash-lite-preview',
       name: 'Gemini 3.1 Flash Lite',
       description: 'Highly efficient model, perfect for high-volume tasks with lower latency.',
-      type: 'Legacy/Efficient',
-      isLegacy: true
+      type: 'Efficient',
+      isLegacy: true,
+      stats: { intelligence: 7, speed: 10, cost: 'Very Low' }
     },
     {
       id: 'gemini-flash-latest',
       name: 'Gemini Flash Latest',
       description: 'The latest stable version of the Flash model.',
       type: 'Stable',
-      isLegacy: false
+      isLegacy: false,
+      stats: { intelligence: 8, speed: 9, cost: 'Low' }
     }
   ];
 };

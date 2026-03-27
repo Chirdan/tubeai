@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { ChannelProfile } from '../types';
-import { generateChannelBranding } from '../services/geminiService';
-import { Sparkles, Save, RefreshCw, Type as TypeIcon, AlignLeft, Palette, User, Mic, Trash2, Plus } from 'lucide-react';
+import { ChannelProfile, AIModel } from '../types';
+import { generateChannelBranding, getAvailableModels } from '../services/geminiService';
+import { Sparkles, Save, RefreshCw, Type as TypeIcon, AlignLeft, Palette, User, Mic, Trash2, Plus, Cpu } from 'lucide-react';
 
 interface BrandingViewProps {
   profile: ChannelProfile | null;
@@ -188,6 +188,32 @@ const BrandingView: React.FC<BrandingViewProps> = ({ profile, onUpdate }) => {
                     >
                       <span className="text-sm font-bold">{v}</span>
                       {localProfile?.clonedVoice === v && <div className="w-2 h-2 rounded-full bg-white animate-pulse" />}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Default AI Engine */}
+              <div>
+                <label className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] mb-4 block flex items-center gap-2">
+                  <Cpu className="w-3 h-3" /> Preferred AI Engine
+                </label>
+                <div className="grid grid-cols-1 gap-2">
+                  {getAvailableModels().map(model => (
+                    <button
+                      key={model.id}
+                      onClick={() => handleInputChange('preferredModel', model.id)}
+                      className={`px-4 py-3 rounded-xl border text-left transition-all flex items-center justify-between group ${
+                        localProfile?.preferredModel === model.id 
+                          ? 'bg-red-600 border-red-500 text-white' 
+                          : 'bg-zinc-950 border-zinc-800 text-zinc-500 hover:border-zinc-600'
+                      }`}
+                    >
+                      <div>
+                        <span className="text-sm font-bold block">{model.name}</span>
+                        <span className="text-[8px] opacity-70 uppercase font-black">{model.type}</span>
+                      </div>
+                      {localProfile?.preferredModel === model.id && <div className="w-2 h-2 rounded-full bg-white animate-pulse" />}
                     </button>
                   ))}
                 </div>

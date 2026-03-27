@@ -8,6 +8,7 @@ export interface ChannelProfile {
   bannerUrl?: string;
   clonedVoice?: string; // Voice name: Zephyr, Puck, Kore, Fenrir, Charon
   clonedLikeness?: string[]; // Array of base64 images
+  preferredModel?: AIModel;
 }
 
 export interface PlatformCaption {
@@ -53,5 +54,18 @@ export type AIModel =
   | 'gemini-flash-latest'
   | 'llama-3-70b'
   | 'mistral-large';
+
+export interface ModelMetadata {
+  id: AIModel;
+  name: string;
+  description: string;
+  type: string;
+  isLegacy: boolean;
+  stats: {
+    intelligence: number;
+    speed: number;
+    cost: string;
+  };
+}
 
 export type ViewType = 'dashboard' | 'branding' | 'studio' | 'media' | 'analytics';
