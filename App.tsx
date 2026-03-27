@@ -8,6 +8,10 @@ import AnalyticsView from './components/AnalyticsView';
 import { Toaster } from 'sonner';
 import { ViewType, ChannelProfile, VideoContent } from './types';
 import { BarChart3, Clock, Menu } from 'lucide-react';
+import { useEffect } from 'react';
+import { StatusBar, Style } from '@capacitor/status-bar';
+import { Keyboard } from '@capacitor/keyboard';
+import { App as CapApp } from '@capacitor/app';
 
 const App: React.FC = () => {
   const [currentView, setView] = useState<ViewType>('dashboard');
@@ -16,6 +20,33 @@ const App: React.FC = () => {
   const [draftVideos, setDraftVideos] = useState<VideoContent[]>([]);
   const [activeDraft, setActiveDraft] = useState<VideoContent | undefined>(undefined);
   const [isSidebarOpen, setSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    // Handle native status bar
+    const setupNative = async () => {
+      try {
+        await StatusBar.setStyle({ style: Style.Dark });
+        await StatusBar.setBackgroundColor({ color: '#060606' });
+      } catch (e) {
+        console.log('Native StatusBar not available');
+      }
+    };
+
+    setupNative();
+
+    // Handle back button for Android
+    const backListener = CapApp.addListener('backButton', ({ canGoBack }) => {
+      if (!canGoBack) {
+        CapApp.exitApp();
+      } else {
+        window.history.back();
+      }
+    });
+
+    return () => {
+      backListener.then(l => l.remove());
+    };
+  }, []);
 
   const handlePost = (video: VideoContent) => {
     setPublishedVideos(prev => [video, ...prev]);

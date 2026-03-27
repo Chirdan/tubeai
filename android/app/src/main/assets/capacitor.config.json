@@ -1,0 +1,6 @@
+{
+	"appId": "com.tubeai.studio",
+	"appName": "TubeAI Studio",
+	"webDir": "dist",
+	"bundledWebRuntime": false
+}
