@@ -1,4 +1,4 @@
-package com.tubeai.studio;
+package com.christopherchirdan.tubeaistudio;
 
 import com.getcapacitor.BridgeActivity;
 
