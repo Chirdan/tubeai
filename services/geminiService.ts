@@ -4,22 +4,22 @@ import { HfInference } from "@huggingface/inference";
 import { ChannelProfile, VideoContent, PlatformCaption, GroundingSource, FreeAsset, AIModel, ModelMetadata } from "../types";
 
 // Robust API key retrieval
-const getApiKey = (keyName: string): string => {
-  // Check process.env (injected by Vite define)
-  const processKey = process.env[keyName];
-  if (processKey) return processKey;
-
-  // Check import.meta.env (Vite standard)
-  const meta = (import.meta as any).env;
-  const metaKey = meta?.[`VITE_${keyName}`] || meta?.[keyName];
-  if (metaKey) return metaKey;
-
-  return "";
+const getGeminiKeyInternal = (): string => {
+  // Vite's define will replace this with the actual value during build
+  return process.env.GEMINI_API_KEY || "";
 };
 
-export const getGeminiKey = () => getApiKey('GEMINI_API_KEY') || getApiKey('API_KEY');
-const getHFKey = () => getApiKey('HUGGINGFACE_API_KEY');
-const getMuapiKey = () => getApiKey('MUAPI_API_KEY');
+const getHFKeyInternal = (): string => {
+  return process.env.HUGGINGFACE_API_KEY || "";
+};
+
+const getMuapiKeyInternal = (): string => {
+  return process.env.MUAPI_API_KEY || "";
+};
+
+export const getGeminiKey = () => getGeminiKeyInternal();
+const getHFKey = () => getHFKeyInternal();
+const getMuapiKey = () => getMuapiKeyInternal();
 
 // Guideline: Implement manual base64 decoding for raw PCM audio
 function decodeBase64(base64: string) {

@@ -30,9 +30,10 @@ const BrandingView: React.FC<BrandingViewProps> = ({ profile, onUpdate }) => {
     try {
       const result = await generateChannelBranding(niche);
       setLocalProfile({ ...result, clonedVoice: localProfile?.clonedVoice, clonedLikeness: localProfile?.clonedLikeness });
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      toast.error("Something went wrong while generating branding.");
+      const msg = error.message || "Something went wrong while generating branding.";
+      toast.error(msg);
     } finally {
       setLoading(false);
     }

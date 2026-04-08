@@ -10,9 +10,13 @@ const __dirname = path.dirname(__filename);
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
-    const apiKey = env.GEMINI_API_KEY || env.API_KEY || "";
-    const hfKey = env.HUGGINGFACE_API_KEY || "";
-    const muapiKey = env.MUAPI_API_KEY || "";
+    
+    // On Vercel, environment variables are in process.env during build.
+    // loadEnv might not pick them all up depending on prefixes.
+    const apiKey = env.GEMINI_API_KEY || process.env.GEMINI_API_KEY || env.VITE_GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || env.API_KEY || process.env.API_KEY || "";
+    const hfKey = env.HUGGINGFACE_API_KEY || process.env.HUGGINGFACE_API_KEY || env.VITE_HUGGINGFACE_API_KEY || process.env.VITE_HUGGINGFACE_API_KEY || "";
+    const muapiKey = env.MUAPI_API_KEY || process.env.MUAPI_API_KEY || env.VITE_MUAPI_API_KEY || process.env.VITE_MUAPI_API_KEY || "";
+
     return {
       server: {
         port: 3000,

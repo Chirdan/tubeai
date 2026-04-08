@@ -1,17 +1,20 @@
 
 import React from 'react';
-import { LayoutDashboard, Palette, Video, Image as ImageIcon, BarChart3, Youtube, X } from 'lucide-react';
+import { LayoutDashboard, Palette, Video, Image as ImageIcon, BarChart3, Youtube, X, LogOut } from 'lucide-react';
 import { ViewType } from '../types';
 import SystemStatus from './SystemStatus';
+import { User } from 'firebase/auth';
 
 interface SidebarProps {
   currentView: ViewType;
   setView: (view: ViewType) => void;
   isOpen: boolean;
   onClose: () => void;
+  user: User | null;
+  onLogout: () => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, isOpen, onClose }) => {
+const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, isOpen, onClose, user, onLogout }) => {
   const items = [
     { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { id: 'branding', icon: Palette, label: 'Channel Architect' },
@@ -75,13 +78,21 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, isOpen, onClose
         <div className="p-4 space-y-4 border-t border-zinc-800">
           <SystemStatus />
           
-          <div className="flex items-center gap-3 px-2">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-zinc-700 to-zinc-500" />
-            <div className="flex-1 overflow-hidden">
-              <p className="text-xs font-bold truncate">Creator Mode</p>
-              <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-black">Active</p>
+          {user && (
+            <div className="flex items-center gap-3 px-2">
+              <img src={user.photoURL || ''} className="w-8 h-8 rounded-full border border-zinc-800" referrerPolicy="no-referrer" />
+              <div className="flex-1 overflow-hidden">
+                <p className="text-xs font-bold truncate">{user.displayName}</p>
+                <button 
+                  onClick={onLogout}
+                  className="text-[10px] text-zinc-500 uppercase tracking-widest font-black hover:text-red-500 transition-colors flex items-center gap-1"
+                >
+                  <LogOut className="w-2.5 h-2.5" />
+                  Logout
+                </button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </aside>
     </>
