@@ -47,7 +47,7 @@ const StudioView: React.FC<StudioViewProps> = ({ profile, onPost, onSaveDraft, i
   const [magicProgress, setMagicProgress] = useState(0);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [freeAssets, setFreeAssets] = useState<FreeAsset[]>([]);
-  const [selectedModel, setSelectedModel] = useState<AIModel>(profile?.preferredModel || 'gemini-3.1-flash-preview');
+  const [selectedModel, setSelectedModel] = useState<AIModel>(profile?.preferredModel || 'gemini-3-flash-preview');
   const [showModelInfo, setShowModelInfo] = useState(false);
   const [showComparisonModal, setShowComparisonModal] = useState(false);
   const [isAdvanced, setIsAdvanced] = useState(false);
@@ -480,7 +480,7 @@ const StudioView: React.FC<StudioViewProps> = ({ profile, onPost, onSaveDraft, i
                           {model.id === 'gemini-3.1-pro-preview' && (
                             <span className="bg-amber-500/20 text-amber-500 text-[7px] font-black uppercase px-1.5 py-0.5 rounded-md border border-amber-500/30">Recommended</span>
                           )}
-                          {model.id === 'gemini-3.1-flash-preview' && (
+                          {model.id === 'gemini-3-flash-preview' && (
                             <span className="bg-emerald-500/20 text-emerald-500 text-[7px] font-black uppercase px-1.5 py-0.5 rounded-md border border-emerald-500/30">Fastest</span>
                           )}
                         </div>

@@ -4,13 +4,22 @@ import { initializeFirestore, collection, doc, setDoc, getDoc, getDocs, query, w
 import firebaseConfig from './firebase-applet-config.json';
 
 // Initialize Firebase SDK
-const app = initializeApp(firebaseConfig);
+const config = {
+  apiKey: process.env.VITE_FIREBASE_API_KEY || firebaseConfig.apiKey,
+  authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN || firebaseConfig.authDomain,
+  projectId: process.env.VITE_FIREBASE_PROJECT_ID || firebaseConfig.projectId,
+  appId: process.env.VITE_FIREBASE_APP_ID || firebaseConfig.appId,
+  storageBucket: firebaseConfig.storageBucket,
+  messagingSenderId: firebaseConfig.messagingSenderId,
+};
+
+const app = initializeApp(config);
 export const auth = getAuth(app);
 
 // Initialize Firestore with long polling to bypass potential proxy/websocket issues
 export const db = initializeFirestore(app, {
   experimentalForceLongPolling: true,
-}, firebaseConfig.firestoreDatabaseId);
+}, process.env.VITE_FIREBASE_DATABASE_ID || firebaseConfig.firestoreDatabaseId);
 
 export const googleProvider = new GoogleAuthProvider();
 

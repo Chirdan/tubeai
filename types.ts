@@ -49,7 +49,7 @@ export interface FreeAsset {
 
 export type AIModel = 
   | 'gemini-3.1-pro-preview' 
-  | 'gemini-3.1-flash-preview' 
+  | 'gemini-3-flash-preview' 
   | 'gemini-3.1-flash-lite-preview' 
   | 'gemini-flash-latest'
   | 'llama-3-70b'

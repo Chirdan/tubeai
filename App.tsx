@@ -67,8 +67,8 @@ const App: React.FC = () => {
   const [draftVideos, setDraftVideos] = useState<VideoContent[]>([]);
   const [activeDraft, setActiveDraft] = useState<VideoContent | undefined>(undefined);
   const [isSidebarOpen, setSidebarOpen] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
-  const [isAuthReady, setIsAuthReady] = useState(false);
+  const [user, setUser] = useState<any>({ uid: 'default-user', displayName: 'Studio Creator', email: 'creator@tubeai.studio', photoURL: 'https://picsum.photos/seed/creator/100/100' });
+  const [isAuthReady, setIsAuthReady] = useState(true);
 
   useEffect(() => {
     // Handle native status bar
@@ -92,15 +92,8 @@ const App: React.FC = () => {
       }
     });
 
-    // Auth listener
-    const unsubscribeAuth = onAuthStateChanged(auth, (u) => {
-      setUser(u);
-      setIsAuthReady(true);
-    });
-
     return () => {
       backListener.then(l => l.remove());
-      unsubscribeAuth();
     };
   }, []);
 
@@ -203,27 +196,6 @@ const App: React.FC = () => {
   };
 
   const renderView = () => {
-    if (!user) {
-      return (
-        <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-8 animate-in fade-in duration-1000">
-          <div className="w-24 h-24 rounded-3xl bg-gradient-to-tr from-zinc-800 to-zinc-950 border border-zinc-800 flex items-center justify-center shadow-2xl">
-            <div className="w-10 h-10 bg-red-600 rounded-full shadow-[0_0_20px_rgba(220,38,38,0.6)] animate-pulse" />
-          </div>
-          <div className="text-center space-y-4">
-            <h1 className="text-4xl md:text-6xl font-black uppercase tracking-tighter">TubeAI Studio</h1>
-            <p className="text-zinc-500 font-medium uppercase tracking-widest text-xs">Neural Content Architect</p>
-          </div>
-          <button 
-            onClick={signInWithGoogle}
-            className="flex items-center gap-3 px-8 py-4 bg-white text-black font-black uppercase tracking-widest rounded-2xl hover:bg-zinc-200 transition-all shadow-xl hover:scale-105 active:scale-95"
-          >
-            <LogIn className="w-5 h-5" />
-            Initialize Session
-          </button>
-        </div>
-      );
-    }
-
     switch (currentView) {
       case 'dashboard':
         return <DashboardView profile={channelProfile} publishedVideos={publishedVideos} setView={setView} />;
@@ -299,8 +271,6 @@ const App: React.FC = () => {
           setView={setView} 
           isOpen={isSidebarOpen} 
           onClose={() => setSidebarOpen(false)} 
-          user={user}
-          onLogout={logout}
         />
         
         <main className="flex-1 overflow-y-auto relative">
@@ -321,20 +291,9 @@ const App: React.FC = () => {
               )}
             </div>
             <div className="flex items-center gap-3 md:gap-6">
-              {user && (
-                <div className="flex items-center gap-3">
-                  <div className="hidden xs:flex flex-col items-end">
-                    <span className="text-[10px] font-black uppercase text-white">{user.displayName}</span>
-                    <span className="text-[8px] font-bold uppercase text-zinc-500">{user.email}</span>
-                  </div>
-                  <img src={user.photoURL || ''} className="w-8 h-8 md:w-10 md:h-10 rounded-xl border border-zinc-800" referrerPolicy="no-referrer" />
-                </div>
-              )}
-              {!user && (
-                <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl md:rounded-2xl bg-gradient-to-tr from-zinc-800 to-zinc-950 border border-zinc-800 flex items-center justify-center">
-                  <div className="w-3 h-3 md:w-4 md:h-4 bg-red-600 rounded-full shadow-[0_0_10px_rgba(220,38,38,0.5)]" />
-                </div>
-              )}
+              <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl md:rounded-2xl bg-gradient-to-tr from-zinc-800 to-zinc-950 border border-zinc-800 flex items-center justify-center">
+                <div className="w-3 h-3 md:w-4 md:h-4 bg-red-600 rounded-full shadow-[0_0_10px_rgba(220,38,38,0.5)]" />
+              </div>
             </div>
           </header>
 

@@ -10,11 +10,9 @@ interface SidebarProps {
   setView: (view: ViewType) => void;
   isOpen: boolean;
   onClose: () => void;
-  user: User | null;
-  onLogout: () => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, isOpen, onClose, user, onLogout }) => {
+const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, isOpen, onClose }) => {
   const items = [
     { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { id: 'branding', icon: Palette, label: 'Channel Architect' },
@@ -77,22 +75,6 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, isOpen, onClose
 
         <div className="p-4 space-y-4 border-t border-zinc-800">
           <SystemStatus />
-          
-          {user && (
-            <div className="flex items-center gap-3 px-2">
-              <img src={user.photoURL || ''} className="w-8 h-8 rounded-full border border-zinc-800" referrerPolicy="no-referrer" />
-              <div className="flex-1 overflow-hidden">
-                <p className="text-xs font-bold truncate">{user.displayName}</p>
-                <button 
-                  onClick={onLogout}
-                  className="text-[10px] text-zinc-500 uppercase tracking-widest font-black hover:text-red-500 transition-colors flex items-center gap-1"
-                >
-                  <LogOut className="w-2.5 h-2.5" />
-                  Logout
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       </aside>
     </>

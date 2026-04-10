@@ -81,66 +81,84 @@ const generateWithHF = async (model: string, prompt: string): Promise<string> =>
   }
 };
 
-export const generateChannelBranding = async (niche: string): Promise<ChannelProfile> => {
+const callGemini = async (parameters: any) => {
   const apiKey = getGeminiKey();
   if (!apiKey) {
-    console.error("Gemini API Key missing in generateChannelBranding");
-    throw new Error("Gemini API Key missing. Please check your environment variables.");
+    throw new Error("GEMINI_API_KEY is missing. Please add it to your project secrets in the Settings menu.");
   }
-  const ai = new GoogleGenAI({ apiKey });
-  const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
-    contents: `Suggest a YouTube channel profile for the niche: "${niche}".`,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          name: { type: Type.STRING },
-          description: { type: Type.STRING },
-          brandingStyle: { type: Type.STRING, description: "Visual style description (e.g. minimalist, futuristic, retro)" },
-        },
-        required: ["name", "description", "brandingStyle"]
-      }
-    }
-  });
 
-  const data = JSON.parse(response.text || '{}');
-  return { ...data, niche };
+  const ai = new GoogleGenAI({ apiKey });
+  try {
+    return await ai.models.generateContent(parameters);
+  } catch (error: any) {
+    console.error("Gemini API Call Failed:", error);
+    const status = error?.status || error?.code;
+    const message = error?.message || "Unknown error";
+    throw new Error(`Gemini API Error (${status || 'No Status'}): ${message}`);
+  }
 };
 
-export const generateContentIdeaWithSearch = async (channel: ChannelProfile, topic: string, model: AIModel = 'gemini-3.1-flash-preview'): Promise<{ content: Partial<VideoContent>, sources: GroundingSource[] }> => {
+export const generateChannelBranding = async (niche: string): Promise<ChannelProfile> => {
+  try {
+    const response = await callGemini({
+      model: 'gemini-3-flash-preview',
+      contents: `Suggest a YouTube channel profile for the niche: "${niche}".`,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            name: { type: Type.STRING },
+            description: { type: Type.STRING },
+            brandingStyle: { type: Type.STRING, description: "Visual style description (e.g. minimalist, futuristic, retro)" },
+          },
+          required: ["name", "description", "brandingStyle"]
+        }
+      }
+    });
+
+    const data = JSON.parse(response.text || '{}');
+    return { ...data, niche };
+  } catch (error) {
+    console.error("Branding generation failed:", error);
+    throw error;
+  }
+};
+
+export const generateContentIdeaWithSearch = async (channel: ChannelProfile, topic: string, model: AIModel = 'gemini-3-flash-preview'): Promise<{ content: Partial<VideoContent>, sources: GroundingSource[] }> => {
   const prompt = `Act as a YouTube strategist for a channel called "${channel.name}" in the niche "${channel.niche}". 
   Using current trends and up-to-date information, generate a video concept based on topic: "${topic}". 
   Include title, description, keywords, and a short script. Return the result in JSON format with keys: title, description, script, tags (array).`;
 
   if (model.startsWith('gemini')) {
-    const apiKey = getGeminiKey();
-    if (!apiKey) throw new Error("Gemini API Key missing.");
-    const ai = new GoogleGenAI({ apiKey });
-    const response = await ai.models.generateContent({
-      model: model,
-      contents: prompt,
-      config: {
-        tools: [{ googleSearch: {} }],
-      }
-    });
-
-    const text = response.text || '';
-    let content = {};
     try {
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        content = JSON.parse(jsonMatch[0]);
-      } else {
+      const response = await callGemini({
+        model: model,
+        contents: prompt,
+        config: {
+          tools: [{ googleSearch: {} }],
+        }
+      });
+
+      const text = response.text || '';
+      let content = {};
+      try {
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          content = JSON.parse(jsonMatch[0]);
+        } else {
+          content = { title: topic, description: text, script: text, tags: [] };
+        }
+      } catch (e) {
         content = { title: topic, description: text, script: text, tags: [] };
       }
-    } catch (e) {
-      content = { title: topic, description: text, script: text, tags: [] };
+      
+      const sources = (response.candidates?.[0]?.groundingMetadata?.groundingChunks as GroundingSource[]) || [];
+      return { content, sources };
+    } catch (error) {
+      console.error("Gemini Search Idea failed:", error);
+      throw error;
     }
-    
-    const sources = (response.candidates?.[0]?.groundingMetadata?.groundingChunks as GroundingSource[]) || [];
-    return { content, sources };
   } else {
     // Hugging Face models
     const text = await generateWithHF(model, prompt);
@@ -160,35 +178,37 @@ export const generateContentIdeaWithSearch = async (channel: ChannelProfile, top
 };
 
 export const generateVoiceCloneTTS = async (script: string, voiceName: string): Promise<string> => {
-  const apiKey = getGeminiKey();
-  if (!apiKey) throw new Error("Gemini API Key missing.");
-  const ai = new GoogleGenAI({ apiKey });
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash-preview-tts",
-    contents: [{ parts: [{ text: `Read the following script naturally and professionally: ${script}` }] }],
-    config: {
-      responseModalities: [Modality.AUDIO],
-      speechConfig: {
-        voiceConfig: {
-          prebuiltVoiceConfig: { voiceName: voiceName || 'Zephyr' },
+  try {
+    const response = await callGemini({
+      model: "gemini-2.5-flash-preview-tts",
+      contents: [{ parts: [{ text: `Read the following script naturally and professionally: ${script}` }] }],
+      config: {
+        responseModalities: [Modality.AUDIO],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: { voiceName: voiceName || 'Zephyr' },
+          },
         },
       },
-    },
-  });
+    });
 
-  const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-  if (!base64Audio) {
-    console.error("Gemini TTS Error: No audio data in response", response);
-    throw new Error("No audio generated by Gemini TTS service.");
+    const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+    if (!base64Audio) {
+      console.error("Gemini TTS Error: No audio data in response", response);
+      throw new Error("No audio generated by Gemini TTS service.");
+    }
+
+    // Create a blob from raw PCM
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+    const audioBuffer = await decodeAudioData(decodeBase64(base64Audio), audioContext, 24000, 1);
+    
+    // Convert buffer to Wav blob for storage (simplified version)
+    const wavBlob = await audioBufferToWav(audioBuffer);
+    return URL.createObjectURL(wavBlob);
+  } catch (error) {
+    console.error("TTS generation failed:", error);
+    throw error;
   }
-
-  // Create a blob from raw PCM
-  const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-  const audioBuffer = await decodeAudioData(decodeBase64(base64Audio), audioContext, 24000, 1);
-  
-  // Convert buffer to Wav blob for storage (simplified version)
-  const wavBlob = await audioBufferToWav(audioBuffer);
-  return URL.createObjectURL(wavBlob);
 };
 
 // Simplified AudioBuffer to Wav helper
@@ -244,47 +264,53 @@ export const generateClonedVideoVeo = async (
   if (!apiKey) throw new Error("Gemini API Key missing.");
   const ai = new GoogleGenAI({ apiKey });
   
-  // Explicitly type the reference images payload and use the correct enum
-  const referenceImagesPayload: VideoGenerationReferenceImage[] = likenessImages.map(img => ({
-    image: {
-      imageBytes: img.split(',')[1],
-      mimeType: 'image/png',
-    },
-    referenceType: VideoGenerationReferenceType.ASSET,
-  }));
+  try {
+    const referenceImagesPayload: VideoGenerationReferenceImage[] = likenessImages.map(img => ({
+      image: {
+        imageBytes: img.split(',')[1],
+        mimeType: 'image/png',
+      },
+      referenceType: VideoGenerationReferenceType.ASSET,
+    }));
 
-  // If we have likeness images, we must use veo-3.1-generate-preview
-  const useLikeness = referenceImagesPayload.length > 0;
-  const model = useLikeness ? 'veo-3.1-generate-preview' : 'veo-3.1-fast-generate-preview';
+    const useLikeness = referenceImagesPayload.length > 0;
+    const model = useLikeness ? 'veo-3.1-generate-preview' : 'veo-3.1-fast-generate-preview';
 
-  let operation = await ai.models.generateVideos({
-    model: model,
-    prompt: prompt,
-    config: {
-      numberOfVideos: 1,
-      resolution: '720p',
-      aspectRatio: aspectRatio,
-      ...(useLikeness ? { referenceImages: referenceImagesPayload } : {})
+    let operation = await ai.models.generateVideos({
+      model: model,
+      prompt: prompt,
+      config: {
+        numberOfVideos: 1,
+        resolution: '720p',
+        aspectRatio: aspectRatio,
+        ...(useLikeness ? { referenceImages: referenceImagesPayload } : {})
+      }
+    });
+
+    while (!operation.done) {
+      await new Promise(resolve => setTimeout(resolve, 10000));
+      operation = await ai.operations.getVideosOperation({ operation: operation });
     }
-  });
 
-  while (!operation.done) {
-    await new Promise(resolve => setTimeout(resolve, 10000));
-    operation = await ai.operations.getVideosOperation({ operation: operation });
+    const videoData = operation.response?.generatedVideos?.[0]?.video;
+    const downloadLink = videoData?.uri;
+    if (!downloadLink) throw new Error("Video download link not found.");
+
+    const response = await fetch(downloadLink, {
+      method: 'GET',
+      headers: {
+        'x-goog-api-key': apiKey,
+      },
+    });
+    
+    if (!response.ok) throw new Error(`Failed to download video: ${response.statusText}`);
+    
+    const blob = await response.blob();
+    return { uri: videoData?.uri || '', blobUrl: URL.createObjectURL(blob) };
+  } catch (error) {
+    console.error("Cloned video generation failed:", error);
+    throw error;
   }
-
-  const videoData = operation.response?.generatedVideos?.[0]?.video;
-  const downloadLink = videoData?.uri;
-  if (!downloadLink) throw new Error("Video download link not found.");
-
-  const response = await fetch(downloadLink, {
-    method: 'GET',
-    headers: {
-      'x-goog-api-key': apiKey,
-    },
-  });
-  const blob = await response.blob();
-  return { uri: videoData?.uri || '', blobUrl: URL.createObjectURL(blob) };
 };
 
 export const animateImageVeo = async (
@@ -296,37 +322,45 @@ export const animateImageVeo = async (
   if (!apiKey) throw new Error("Gemini API Key missing.");
   const ai = new GoogleGenAI({ apiKey });
   
-  let operation = await ai.models.generateVideos({
-    model: 'veo-3.1-fast-generate-preview',
-    prompt: prompt || "Animate this image naturally with subtle motion.",
-    image: {
-      imageBytes: imageBase64.split(',')[1] || imageBase64,
-      mimeType: 'image/png',
-    },
-    config: {
-      numberOfVideos: 1,
-      resolution: '720p',
-      aspectRatio: aspectRatio,
+  try {
+    let operation = await ai.models.generateVideos({
+      model: 'veo-3.1-fast-generate-preview',
+      prompt: prompt || "Animate this image naturally with subtle motion.",
+      image: {
+        imageBytes: imageBase64.split(',')[1] || imageBase64,
+        mimeType: 'image/png',
+      },
+      config: {
+        numberOfVideos: 1,
+        resolution: '720p',
+        aspectRatio: aspectRatio,
+      }
+    });
+
+    while (!operation.done) {
+      await new Promise(resolve => setTimeout(resolve, 10000));
+      operation = await ai.operations.getVideosOperation({ operation: operation });
     }
-  });
 
-  while (!operation.done) {
-    await new Promise(resolve => setTimeout(resolve, 10000));
-    operation = await ai.operations.getVideosOperation({ operation: operation });
+    const videoData = operation.response?.generatedVideos?.[0]?.video;
+    const downloadLink = videoData?.uri;
+    if (!downloadLink) throw new Error("Video download link not found.");
+
+    const response = await fetch(downloadLink, {
+      method: 'GET',
+      headers: {
+        'x-goog-api-key': apiKey,
+      },
+    });
+    
+    if (!response.ok) throw new Error(`Failed to download animated video: ${response.statusText}`);
+    
+    const blob = await response.blob();
+    return { uri: videoData?.uri || '', blobUrl: URL.createObjectURL(blob) };
+  } catch (error) {
+    console.error("Image animation failed:", error);
+    throw error;
   }
-
-  const videoData = operation.response?.generatedVideos?.[0]?.video;
-  const downloadLink = videoData?.uri;
-  if (!downloadLink) throw new Error("Video download link not found.");
-
-  const response = await fetch(downloadLink, {
-    method: 'GET',
-    headers: {
-      'x-goog-api-key': apiKey,
-    },
-  });
-  const blob = await response.blob();
-  return { uri: videoData?.uri || '', blobUrl: URL.createObjectURL(blob) };
 };
 
 export const extendVideoVeo = async (
@@ -338,68 +372,87 @@ export const extendVideoVeo = async (
   if (!apiKey) throw new Error("Gemini API Key missing.");
   const ai = new GoogleGenAI({ apiKey });
   
-  let operation = await ai.models.generateVideos({
-    model: 'veo-3.1-generate-preview',
-    prompt: prompt || "Continue the scene naturally.",
-    video: {
-      uri: videoUri
-    },
-    config: {
-      numberOfVideos: 1,
-      resolution: '720p',
-      aspectRatio: aspectRatio,
+  try {
+    let operation = await ai.models.generateVideos({
+      model: 'veo-3.1-generate-preview',
+      prompt: prompt || "Continue the scene naturally.",
+      video: {
+        uri: videoUri
+      },
+      config: {
+        numberOfVideos: 1,
+        resolution: '720p',
+        aspectRatio: aspectRatio,
+      }
+    });
+
+    while (!operation.done) {
+      await new Promise(resolve => setTimeout(resolve, 10000));
+      operation = await ai.operations.getVideosOperation({ operation: operation });
     }
-  });
 
-  while (!operation.done) {
-    await new Promise(resolve => setTimeout(resolve, 10000));
-    operation = await ai.operations.getVideosOperation({ operation: operation });
+    const videoData = operation.response?.generatedVideos?.[0]?.video;
+    const downloadLink = videoData?.uri;
+    if (!downloadLink) throw new Error("Video download link not found.");
+
+    const response = await fetch(downloadLink, {
+      method: 'GET',
+      headers: {
+        'x-goog-api-key': apiKey,
+      },
+    });
+    
+    if (!response.ok) throw new Error(`Failed to download extended video: ${response.statusText}`);
+    
+    const blob = await response.blob();
+    return { uri: videoData?.uri || '', blobUrl: URL.createObjectURL(blob) };
+  } catch (error) {
+    console.error("Video extension failed:", error);
+    throw error;
   }
-
-  const videoData = operation.response?.generatedVideos?.[0]?.video;
-  const downloadLink = videoData?.uri;
-  const response = await fetch(`${downloadLink}&key=${apiKey}`);
-  const blob = await response.blob();
-  return { uri: videoData?.uri || '', blobUrl: URL.createObjectURL(blob) };
 };
 
 export const thinkComplexQuery = async (query: string, model: AIModel = 'gemini-3.1-pro-preview'): Promise<string> => {
   if (model.startsWith('gemini')) {
-    const apiKey = getGeminiKey();
-    if (!apiKey) throw new Error("Gemini API Key missing.");
-    const ai = new GoogleGenAI({ apiKey });
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.1-pro-preview', // Always use pro for complex thinking if gemini is selected
-      contents: query,
-      config: {
-        thinkingConfig: { thinkingBudget: 32768 }
-      }
-    });
-    return response.text || "Thinking failed.";
+    try {
+      const response = await callGemini({
+        model: 'gemini-3.1-pro-preview', // Always use pro for complex thinking if gemini is selected
+        contents: query,
+        config: {
+          thinkingConfig: { thinkingBudget: 32768 }
+        }
+      });
+      return response.text || "Thinking failed.";
+    } catch (error) {
+      console.error("Thinking failed:", error);
+      throw error;
+    }
   } else {
     return await generateWithHF(model, `Think deeply and provide a detailed answer to: ${query}`);
   }
 };
 
 export const analyzeVideo = async (videoBase64: string, mimeType: string, prompt: string): Promise<string> => {
-  const apiKey = getGeminiKey();
-  if (!apiKey) throw new Error("Gemini API Key missing.");
-  const ai = new GoogleGenAI({ apiKey });
-  const response = await ai.models.generateContent({
-    model: 'gemini-3-pro-preview',
-    contents: {
-      parts: [
-        {
-          inlineData: {
-            data: videoBase64,
-            mimeType: mimeType
-          }
-        },
-        { text: prompt }
-      ]
-    }
-  });
-  return response.text || "Could not analyze video.";
+  try {
+    const response = await callGemini({
+      model: 'gemini-3-pro-preview',
+      contents: {
+        parts: [
+          {
+            inlineData: {
+              data: videoBase64,
+              mimeType: mimeType
+            }
+          },
+          { text: prompt }
+        ]
+      }
+    });
+    return response.text || "Could not analyze video.";
+  } catch (error) {
+    console.error("Video analysis failed:", error);
+    throw error;
+  }
 };
 
 export const generateThumbnail = async (title: string, style: string): Promise<string> => {
@@ -430,27 +483,30 @@ export const generateThumbnail = async (title: string, style: string): Promise<s
   }
 
   // Fallback to Gemini 2.5 Flash Image
-  if (!geminiKey) throw new Error("Gemini API Key missing for thumbnail generation.");
-  const ai = new GoogleGenAI({ apiKey: geminiKey });
-  const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash-image',
-    contents: {
-      parts: [{ text: `High-quality YouTube thumbnail for a video titled "${title}". Style: ${style}. Vibrant colors, eye-catching text placement, 4k, cinematic.` }]
-    },
-    config: {
-      imageConfig: { aspectRatio: "16:9" }
-    }
-  });
+  try {
+    const response = await callGemini({
+      model: 'gemini-2.5-flash-image',
+      contents: {
+        parts: [{ text: `High-quality YouTube thumbnail for a video titled "${title}". Style: ${style}. Vibrant colors, eye-catching text placement, 4k, cinematic.` }]
+      },
+      config: {
+        imageConfig: { aspectRatio: "16:9" }
+      }
+    });
 
-  for (const part of response.candidates?.[0]?.content?.parts || []) {
-    if (part.inlineData) {
-      return `data:image/png;base64,${part.inlineData.data}`;
+    for (const part of response.candidates?.[0]?.content?.parts || []) {
+      if (part.inlineData) {
+        return `data:image/png;base64,${part.inlineData.data}`;
+      }
     }
+    throw new Error("Failed to generate image asset");
+  } catch (error) {
+    console.error("Thumbnail generation failed:", error);
+    throw error;
   }
-  throw new Error("Failed to generate image asset");
 };
 
-export const generateStoryboard = async (title: string, script: string, model: AIModel = 'gemini-3.1-flash-preview'): Promise<string> => {
+export const generateStoryboard = async (title: string, script: string, model: AIModel = 'gemini-3-flash-preview'): Promise<string> => {
   const prompt = `Based on the video title "${title}" and script, create a detailed visual storyboard. 
   Describe exactly what should be shown on screen for each major scene. Break it down into "Scene 1: Visuals...", "Scene 2: Visuals...". 
   Focus on lighting, camera angles, and action.
@@ -458,21 +514,23 @@ export const generateStoryboard = async (title: string, script: string, model: A
   Script: ${script}`;
 
   if (model.startsWith('gemini')) {
-    const apiKey = getGeminiKey();
-    if (!apiKey) throw new Error("Gemini API Key missing.");
-    const ai = new GoogleGenAI({ apiKey });
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.1-flash-preview',
-      contents: prompt
-    });
-    return response.text || "No storyboard generated.";
+    try {
+      const response = await callGemini({
+        model: model,
+        contents: prompt
+      });
+      return response.text || "No storyboard generated.";
+    } catch (error) {
+      console.error("Storyboard generation failed:", error);
+      throw error;
+    }
   } else {
     return await generateWithHF(model, prompt);
   }
 };
 
 // Added missing export: Generate engaging social media captions for multiple platforms
-export const generatePlatformCaptions = async (title: string, script: string, platforms: string[], model: AIModel = 'gemini-3.1-flash-preview'): Promise<PlatformCaption[]> => {
+export const generatePlatformCaptions = async (title: string, script: string, platforms: string[], model: AIModel = 'gemini-3-flash-preview'): Promise<PlatformCaption[]> => {
   const prompt = `Adapt the following content for social media captions.
   Title: ${title}
   Script: ${script}
@@ -480,28 +538,30 @@ export const generatePlatformCaptions = async (title: string, script: string, pl
   Return the result in JSON format as an array of objects with keys: platform, caption.`;
 
   if (model.startsWith('gemini')) {
-    const apiKey = getGeminiKey();
-    if (!apiKey) throw new Error("Gemini API Key missing.");
-    const ai = new GoogleGenAI({ apiKey });
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.1-flash-preview',
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              platform: { type: Type.STRING },
-              caption: { type: Type.STRING }
-            },
-            required: ["platform", "caption"]
+    try {
+      const response = await callGemini({
+        model: model,
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                platform: { type: Type.STRING },
+                caption: { type: Type.STRING }
+              },
+              required: ["platform", "caption"]
+            }
           }
         }
-      }
-    });
-    return JSON.parse(response.text || '[]');
+      });
+      return JSON.parse(response.text || '[]');
+    } catch (error) {
+      console.error("Platform captions generation failed:", error);
+      throw error;
+    }
   } else {
     const text = await generateWithHF(model, prompt);
     try {
@@ -517,34 +577,31 @@ export const generatePlatformCaptions = async (title: string, script: string, pl
   }
 };
 
-export const generateTopicSuggestions = async (channel: ChannelProfile, model: AIModel = 'gemini-3.1-flash-preview'): Promise<string[]> => {
+export const generateTopicSuggestions = async (channel: ChannelProfile, model: AIModel = 'gemini-3-flash-preview'): Promise<string[]> => {
   const prompt = `As a YouTube strategist for a channel called "${channel.name}" in the niche "${channel.niche}", 
   suggest 5 trending and highly engaging video topics that would perform well right now. 
   Focus on high click-through rate (CTR) and viewer retention.
   Return only a JSON array of 5 strings.`;
 
   if (model.startsWith('gemini')) {
-    const apiKey = getGeminiKey();
-    if (!apiKey) throw new Error("Gemini API Key missing.");
-    const ai = new GoogleGenAI({ apiKey });
-    const response = await ai.models.generateContent({
-      model: model,
-      contents: prompt,
-      config: {
-        tools: [{ googleSearch: {} }],
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: { type: Type.STRING }
-        }
-      }
-    });
-
     try {
+      const response = await callGemini({
+        model: model,
+        contents: prompt,
+        config: {
+          tools: [{ googleSearch: {} }],
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING }
+          }
+        }
+      });
+
       return JSON.parse(response.text || '[]');
-    } catch (e) {
-      console.error("Failed to parse topic suggestions", e);
-      return [];
+    } catch (error) {
+      console.error("Topic suggestions generation failed:", error);
+      throw error;
     }
   } else {
     const text = await generateWithHF(model, prompt);
@@ -562,40 +619,37 @@ export const generateTopicSuggestions = async (channel: ChannelProfile, model: A
 };
 
 export const searchFreeAssets = async (topic: string): Promise<FreeAsset[]> => {
-  const apiKey = getGeminiKey();
-  if (!apiKey) throw new Error("Gemini API Key missing.");
-  const ai = new GoogleGenAI({ apiKey });
   const prompt = `Find 6 high-quality, free-to-use content materials (stock images, videos, or music) related to the topic: "${topic}". 
   Look for resources from reputable sites like Pexels, Pixabay, Unsplash, or Free Music Archive.
   Return the result as a JSON array of objects with keys: title, url, type (one of: 'image', 'video', 'audio', 'other'), source.`;
 
-  const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
-    contents: prompt,
-    config: {
-      tools: [{ googleSearch: {} }],
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.ARRAY,
-        items: {
-          type: Type.OBJECT,
-          properties: {
-            title: { type: Type.STRING },
-            url: { type: Type.STRING },
-            type: { type: Type.STRING, enum: ['image', 'video', 'audio', 'other'] },
-            source: { type: Type.STRING }
-          },
-          required: ["title", "url", "type", "source"]
+  try {
+    const response = await callGemini({
+      model: 'gemini-3-flash-preview',
+      contents: prompt,
+      config: {
+        tools: [{ googleSearch: {} }],
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              title: { type: Type.STRING },
+              url: { type: Type.STRING },
+              type: { type: Type.STRING, enum: ['image', 'video', 'audio', 'other'] },
+              source: { type: Type.STRING }
+            },
+            required: ["title", "url", "type", "source"]
+          }
         }
       }
-    }
-  });
+    });
 
-  try {
     return JSON.parse(response.text || '[]');
-  } catch (e) {
-    console.error("Failed to parse free assets", e);
-    return [];
+  } catch (error) {
+    console.error("Free assets search failed:", error);
+    throw error;
   }
 };
 
@@ -610,7 +664,7 @@ export const getAvailableModels = (): ModelMetadata[] => {
       stats: { intelligence: 10, speed: 6, cost: 'High' }
     },
     {
-      id: 'gemini-3.1-flash-preview',
+      id: 'gemini-3-flash-preview',
       name: 'Gemini 3.1 Flash',
       description: 'Fast, balanced model for quick generation and real-time trends.',
       type: 'Balanced',
